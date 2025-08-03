@@ -4,26 +4,34 @@ div
 
   input-timeinterval(v-model="daterange", :defaultDuration="timeintervalDefaultDuration", :maxDuration="maxDuration").mb-3
 
-  // blocks
+  // filters panel
   details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2
     summary.p-2
       b Filters
-    div.p-2.bg-light
-      table
-        tr
-          th.pt-2.pr-3
-            label Host:
-          td
-              select(v-model="filter_hostname")
-                option(:value='null') All
-                option(v-for="host in hosts", :value="host") {{ host }}
-        tr
-          th.pt-2.pr-3
-            label Client:
-          td
-            select(v-model="filter_client")
-              option(:value='null') All
-              option(v-for="client in clients", :value="client") {{ client }}
+    div.p-2.bg-light.filter-panel
+      // Host filter controls
+      .filter-group.mb-2
+        label.mb-1.mr-2 Host:
+        .btn-group.mb-1
+          button.btn.btn-sm.btn-link(@click.prevent="selectAllHosts") All
+          button.btn.btn-sm.btn-link(@click.prevent="clearAllHosts") None
+        .checkbox-list.mb-3
+          div(v-for="host in hosts" :key="host")
+            label.d-block
+              input(type="checkbox" :value="host" v-model="filter_hostnames" class="mr-2")
+              | {{ host }}
+      // Client filter controls
+      .filter-group
+        label.mb-1.mr-2 Client:
+        .btn-group.mb-1
+          button.btn.btn-sm.btn-link(@click.prevent="selectAllClients") All
+          button.btn.btn-sm.btn-link(@click.prevent="clearAllClients") None
+        .checkbox-list
+          div(v-for="client in clients" :key="client")
+            label.d-block
+              input(type="checkbox" :value="client" v-model="filter_clients" class="mr-2")
+              | {{ client }}
+
   div.d-inline-block.border.rounded.p-2.mr-2(v-if="num_events !== 0")
     | Events shown: {{ num_events }}
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
@@ -50,40 +58,34 @@ export default {
   name: 'Timeline',
   data() {
     return {
-      all_buckets: null,
-      hosts: null,
-      buckets: null,
-      clients: null,
-      daterange: null,
+      all_buckets: null as any[] | null,
+      hosts: null as string[] | null,
+      buckets: null as any[] | null,
+      clients: null as string[] | null,
+      daterange: null as any,
       maxDuration: 31 * 24 * 60 * 60,
-      filter_hostname: null,
-      filter_client: null,
+      filter_hostnames: [] as string[],
+      filter_clients: [] as string[],
+      firstLoad: true,
     };
   },
   computed: {
-    timeintervalDefaultDuration() {
+    timeintervalDefaultDuration(): number {
       const settingsStore = useSettingsStore();
       return Number(settingsStore.durationDefault);
     },
-    // This does not match the chartData which is rendered in the timeline, as chartData excludes short events.
-    num_events() {
-      return _.sumBy(this.buckets, 'events.length');
+    num_events(): number {
+      return _.sumBy(this.buckets || [], 'events.length');
     },
   },
   watch: {
-    daterange() {
-      this.getBuckets();
-    },
-    filter_hostname() {
-      this.getBuckets();
-    },
-    filter_client() {
-      this.getBuckets();
-    },
+    daterange: 'getBuckets',
+    filter_hostnames: 'getBuckets',
+    filter_clients: 'getBuckets',
   },
   methods: {
-    getBuckets: async function () {
-      if (this.daterange == null) return;
+    async getBuckets() {
+      if (!this.daterange) return;
 
       this.all_buckets = Object.freeze(
         await useBucketsStore().getBucketsWithEvents({
@@ -92,21 +94,36 @@ export default {
         })
       );
 
-      this.hosts = this.all_buckets
-        .map(a => a.hostname)
-        .filter((value, index, array) => array.indexOf(value) === index);
-      this.clients = this.all_buckets
-        .map(a => a.client)
-        .filter((value, index, array) => array.indexOf(value) === index);
+      this.hosts = [...new Set(this.all_buckets.map(a => a.hostname))];
+      this.clients = [...new Set(this.all_buckets.map(a => a.client))];
+
+      // default select all only once
+      if (this.firstLoad) {
+        this.filter_hostnames = [...(this.hosts || [])];
+        this.filter_clients = [...(this.clients || [])];
+        this.firstLoad = false;
+      }
 
       let buckets = this.all_buckets;
-      if (this.filter_hostname) {
-        buckets = _.filter(buckets, b => b.hostname == this.filter_hostname);
+      if (this.filter_hostnames.length) {
+        buckets = buckets.filter(b => this.filter_hostnames.includes(b.hostname));
       }
-      if (this.filter_client) {
-        buckets = _.filter(buckets, b => b.client == this.filter_client);
+      if (this.filter_clients.length) {
+        buckets = buckets.filter(b => this.filter_clients.includes(b.client));
       }
       this.buckets = buckets;
+    },
+    selectAllHosts() {
+      this.filter_hostnames = [...(this.hosts || [])];
+    },
+    clearAllHosts() {
+      this.filter_hostnames = [];
+    },
+    selectAllClients() {
+      this.filter_clients = [...(this.clients || [])];
+    },
+    clearAllClients() {
+      this.filter_clients = [];
     },
   },
 };
@@ -126,5 +143,21 @@ details[open] summary ~ * {
   top: 2.7em;
   background: white;
   z-index: 100;
+}
+
+.filter-panel {
+  min-width: 250px;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+}
+.filter-group {
+  margin-bottom: 0.5rem;
+}
+.btn-group button {
+  margin-right: 0.5rem;
+  padding: 0;
 }
 </style>
