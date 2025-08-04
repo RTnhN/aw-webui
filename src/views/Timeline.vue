@@ -101,7 +101,7 @@ export default {
     },
     num_events(): number {
       return _.sumBy(this.buckets || [], 'events.length');
-    }
+    },
   },
   watch: {
     daterange() {
