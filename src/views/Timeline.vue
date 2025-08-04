@@ -5,53 +5,54 @@ div
   input-timeinterval(v-model="daterange", :defaultDuration="timeintervalDefaultDuration", :maxDuration="maxDuration").mb-3
 
   // blocks
-  div.d-inline-block.border.rounded.p-2.mr-2
-    | Swimlanes:  
-    select(v-model="swimlane")
-      option(:value='null') None
-      option(value='category') Categories
-      option(value='bucketType') Bucket Specific
-  details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2(ref="filterDetails")
-    summary.p-2
-      b Filters
-    div.p-2.bg-light.filter-panel
-      // Host filter controls
-      .filter-group.mb-2
-        label.mb-1.mr-2 Host:
-        .btn-group.mb-1
-          button.btn.btn-sm.btn-link(@click.prevent="selectAllHosts") All
-          button.btn.btn-sm.btn-link(@click.prevent="clearAllHosts") None
-        .checkbox-list.mb-3
-          div(v-for="host in hosts" :key="host")
-            label.d-block
-              input(type="checkbox" :value="host" v-model="filter_hostnames" class="mr-2")
-              | {{ host }}
-      // Client filter controls
-      .filter-group
-        label.mb-1.mr-2 Client:
-        .btn-group.mb-1
-          button.btn.btn-sm.btn-link(@click.prevent="selectAllClients") All
-          button.btn.btn-sm.btn-link(@click.prevent="clearAllClients") None
-        .checkbox-list
-          div(v-for="client in clients" :key="client")
-            label.d-block
-              input(type="checkbox" :value="client" v-model="filter_clients" class="mr-2")
-              | {{ client }}
-  div.d-inline-block.border.rounded.p-2.mr-2
-    | Duration: 
-    select(v-model="filter_duration")
-      option(:value='null') All
-      option(:value='2') 2+ secs
-      option(:value='5') 5+ secs
-      option(:value='10') 10+ secs 
-      option(:value='30') 30+ sec
-      option(:value='1 * 60') 1+ mins
-      option(:value='2 * 60') 2+ mins
-      option(:value='3 * 60') 3+ mins
-      option(:value='10 * 60') 10+ mins
-      option(:value='30 * 60') 30+ mins
-      option(:value='1 * 60 * 60') 1+ hrs
-      option(:value='2 * 60 * 60') 2+ hrs
+  div.d-inline-block.border.rounded.mr-2
+    div.d-inline-block.p-2.mr-2
+      | Swimlanes:  
+      select(v-model="swimlane")
+        option(:value='null') None
+        option(value='category') Categories
+        option(value='bucketType') Bucket Specific
+    details.d-inline-block.bg-light.mr-2.p-2(ref="filterDetails")
+      summary
+        | Host and Client Filters
+      div.p-2.bg-light.filter-panel
+        // Host filter controls
+        .filter-group.mb-2
+          label.mb-1.mr-2 Host:
+          .btn-group.mb-1
+            button.btn.btn-sm.btn-link(@click.prevent="selectAllHosts") All
+            button.btn.btn-sm.btn-link(@click.prevent="clearAllHosts") None
+          .checkbox-list.mb-3
+            div(v-for="host in hosts" :key="host")
+              label.d-block
+                input(type="checkbox" :value="host" v-model="filter_hostnames" class="mr-2")
+                | {{ host }}
+        // Client filter controls
+        .filter-group
+          label.mb-1.mr-2 Client:
+          .btn-group.mb-1
+            button.btn.btn-sm.btn-link(@click.prevent="selectAllClients") All
+            button.btn.btn-sm.btn-link(@click.prevent="clearAllClients") None
+          .checkbox-list
+            div(v-for="client in clients" :key="client")
+              label.d-block
+                input(type="checkbox" :value="client" v-model="filter_clients" class="mr-2")
+                | {{ client }}
+    div.d-inline-block.p-2.mr-2
+      | Duration: 
+      select(v-model="filter_duration")
+        option(:value='null') All
+        option(:value='2') 2+ secs
+        option(:value='5') 5+ secs
+        option(:value='10') 10+ secs 
+        option(:value='30') 30+ sec
+        option(:value='1 * 60') 1+ mins
+        option(:value='2 * 60') 2+ mins
+        option(:value='3 * 60') 3+ mins
+        option(:value='10 * 60') 10+ mins
+        option(:value='30 * 60') 30+ mins
+        option(:value='1 * 60 * 60') 1+ hrs
+        option(:value='2 * 60 * 60') 2+ hrs
   div.d-inline-block.border.rounded.p-2.mr-2(v-if="num_events !== 0")
     | Events shown: {{ num_events }}
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
