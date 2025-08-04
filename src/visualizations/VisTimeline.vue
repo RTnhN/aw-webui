@@ -134,7 +134,7 @@ export default {
             end: new Date(moment(e.timestamp).add(e.duration, 'seconds').valueOf()),
             color: getCategoryColorFromEvent(bucket, e),
             event: e,
-            swimlane: getSwimlane(bucket, e.color, this.swimlane, e),
+            swimlane: getSwimlane(bucket, getCategoryColorFromEvent(bucket, e), this.swimlane, e),
           });
         });
       });

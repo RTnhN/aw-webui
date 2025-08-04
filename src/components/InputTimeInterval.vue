@@ -27,33 +27,46 @@ div
         td.pr-2
           label.col-form-label.col-form-label-sm Show from
         td
-          select(id="mode", v-model="mode", @change="valueChanged")
-            option(value='last_duration') Last duration
-            option(value='range') Date range
-      tr(v-if="mode == 'last_duration'")
-        th.pr-2
-          label(for="duration") Show last:
-        td
-          select(id="duration", v-model="duration", @change="valueChanged")
-            option(:value="15*60") 15min
-            option(:value="30*60") 30min
-            option(:value="60*60") 1h
-            option(:value="2*60*60") 2h
-            option(:value="4*60*60") 4h
-            option(:value="6*60*60") 6h
-            option(:value="12*60*60") 12h
-            option(:value="24*60*60") 24h
-      tr(v-if="mode == 'range'")
-        th.pr-2 Range:
-        td
-          input(type="date", v-model="start")
-          input(type="date", v-model="end")
-          button(
-            class="btn btn-outline-dark btn-sm",
+          input.form-control.form-control-sm.d-inline-block.p-1(type="date", v-model="start", style="height: auto; width: auto;")
+          label.col-form-label.col-form-label-sm.px-2 to
+          input.form-control.form-control-sm.d-inline.p-1(type="date", v-model="end", style="height: auto; width: auto")
+        td.text-right
+          button.ml-2.btn.btn-outline-dark.btn-sm(
             type="button",
             :disabled="invalidDaterange || emptyDaterange || daterangeTooLong",
             @click="applyRange"
           ) Apply
+
+      tr
+        td.pr-2
+          label.col-form-label.col-form-label-sm Shift date
+        td
+          .btn-group.show-day-group(role="group")
+            input.btn.btn-light.btn-sm(
+              type="button",
+              value="-1w",
+              @click="shiftDay(-7); $event.target.blur()"
+            )
+            input.btn.btn-light.btn-sm(
+              type="button",
+              value="-1d",
+              @click="shiftDay(-1); $event.target.blur()"
+            )
+            input.btn.btn-light.btn-sm(
+              type="button",
+              value="Today",
+              @click="setToday(); $event.target.blur()"
+            )
+            input.btn.btn-light.btn-sm(
+              type="button",
+              value="+1d",
+              @click="shiftDay(1); $event.target.blur()"
+            )
+            input.btn.btn-light.btn-sm(
+              type="button",
+              value="+1w",
+              @click="shiftDay(7); $event.target.blur()"
+            )
 
     div.text-muted.d-none.d-md-block(style="text-align:right" v-if="showUpdate")
       b-button.mt-2.px-2(@click="refresh()", variant="outline-dark", size="sm", style="opacity: 0.7")
@@ -170,6 +183,25 @@ export default {
     },
     applyLastDuration() {
       this.mode = 'last_duration';
+      this.valueChanged();
+    },
+    setToday() {
+      const today = moment().format('YYYY-MM-DD');
+      this.start = today;
+      this.end = today;
+      this.mode = 'range';
+      this.duration = 0;
+      this.valueChanged();
+    },
+    shiftDay(days: number) {
+      const currentStart = this.start ? moment(this.start, 'YYYY-MM-DD') : moment();
+      const currentEnd = this.end ? moment(this.end, 'YYYY-MM-DD') : moment();
+      const newStart = currentStart.add(days, 'days').format('YYYY-MM-DD');
+      const newEnd = currentEnd.add(days, 'days').format('YYYY-MM-DD');
+      this.start = newStart;
+      this.end = newEnd;
+      this.mode = 'range';
+      this.duration = 0;
       this.valueChanged();
     },
   },
