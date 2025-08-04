@@ -37,29 +37,26 @@ div
             label.d-block
               input(type="checkbox" :value="client" v-model="filter_clients" class="mr-2")
               | {{ client }}
-
+  div.d-inline-block.border.rounded.p-2.mr-2
+    | Duration: 
+    select(v-model="filter_duration")
+      option(:value='null') All
+      option(:value='2') 2+ secs
+      option(:value='5') 5+ secs
+      option(:value='10') 10+ secs 
+      option(:value='30') 30+ sec
+      option(:value='1 * 60') 1+ mins
+      option(:value='2 * 60') 2+ mins
+      option(:value='3 * 60') 3+ mins
+      option(:value='10 * 60') 10+ mins
+      option(:value='30 * 60') 30+ mins
+      option(:value='1 * 60 * 60') 1+ hrs
+      option(:value='2 * 60 * 60') 2+ hrs
   div.d-inline-block.border.rounded.p-2.mr-2(v-if="num_events !== 0")
     | Events shown: {{ num_events }}
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
     | No events match selected criteria. Timeline is not updated.
-  div.float-right.small.text-muted.pt-3
-        tr
-          th.pt-2.pr-3
-            label Duration:
-          td
-            select(v-model="filter_duration")
-              option(:value='null') All
-              option(:value='2') 2+ secs
-              option(:value='5') 5+ secs
-              option(:value='10') 10+ secs
-              option(:value='30') 30+ sec
-              option(:value='1 * 60') 1+ mins
-              option(:value='2 * 60') 2+ mins
-              option(:value='3 * 60') 3+ mins
-              option(:value='10 * 60') 10+ mins
-              option(:value='30 * 60') 30+ mins
-              option(:value='1 * 60 * 60') 1+ hrs
-              option(:value='2 * 60 * 60') 2+ hrs
+  
   div(style="float: right; color: #999").d-inline-block.pt-3
     | Drag to pan and scroll to zoom
 
