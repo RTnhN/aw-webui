@@ -4,7 +4,13 @@ div
 
   input-timeinterval(v-model="daterange", :defaultDuration="timeintervalDefaultDuration", :maxDuration="maxDuration").mb-3
 
-  // filters panel
+  // blocks
+  div.d-inline-block.border.rounded.p-2.mr-2
+    | Swimlanes:  
+    select(v-model="swimlane")
+      option(:value='null') None
+      option(value='category') Categories
+      option(value='bucketType') Bucket Specific
   details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2
     summary.p-2
       b Filters
@@ -37,11 +43,29 @@ div
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
     | No events match selected criteria. Timeline is not updated.
   div.float-right.small.text-muted.pt-3
+        tr
+          th.pt-2.pr-3
+            label Duration:
+          td
+            select(v-model="filter_duration")
+              option(:value='null') All
+              option(:value='2') 2+ secs
+              option(:value='5') 5+ secs
+              option(:value='10') 10+ secs
+              option(:value='30') 30+ sec
+              option(:value='1 * 60') 1+ mins
+              option(:value='2 * 60') 2+ mins
+              option(:value='3 * 60') 3+ mins
+              option(:value='10 * 60') 10+ mins
+              option(:value='30 * 60') 30+ mins
+              option(:value='1 * 60 * 60') 1+ hrs
+              option(:value='2 * 60 * 60') 2+ hrs
+  div(style="float: right; color: #999").d-inline-block.pt-3
     | Drag to pan and scroll to zoom
 
   div(v-if="buckets !== null")
     div(style="clear: both")
-    vis-timeline(:buckets="buckets", :showRowLabels='true', :queriedInterval="daterange")
+    vis-timeline(:buckets="buckets", :showRowLabels='true', :queriedInterval="daterange", :swimlane="swimlane", :updateTimelineWindow='updateTimelineWindow')
 
     aw-devonly(reason="Not ready for production, still experimenting")
       aw-calendar(:buckets="buckets")
@@ -67,6 +91,9 @@ export default {
       filter_hostnames: [] as string[],
       filter_clients: [] as string[],
       firstLoad: true,
+      filter_duration: null,
+      swimlane: null,
+      updateTimelineWindow: true,
     };
   },
   computed: {
@@ -76,12 +103,29 @@ export default {
     },
     num_events(): number {
       return _.sumBy(this.buckets || [], 'events.length');
-    },
+    }
   },
   watch: {
-    daterange: 'getBuckets',
-    filter_hostnames: 'getBuckets',
-    filter_clients: 'getBuckets',
+    daterange() {
+      this.updateTimelineWindow = true;
+      this.getBuckets();
+    },
+    filter_hostnames() {
+      this.updateTimelineWindow = false;
+      this.getBuckets();
+    },
+    filter_clients() {
+      this.updateTimelineWindow = false;
+      this.getBuckets();
+    },
+    filter_duration() {
+      this.updateTimelineWindow = false;
+      this.getBuckets();
+    },
+    swimlane() {
+      this.updateTimelineWindow = false;
+      this.getBuckets();
+    },
   },
   methods: {
     async getBuckets() {
@@ -111,6 +155,12 @@ export default {
       if (this.filter_clients.length) {
         buckets = buckets.filter(b => this.filter_clients.includes(b.client));
       }
+      if (this.filter_duration > 0) {
+        for (const bucket of buckets) {
+          bucket.events = _.filter(bucket.events, e => e.duration >= this.filter_duration);
+        }
+      }
+
       this.buckets = buckets;
     },
     selectAllHosts() {
