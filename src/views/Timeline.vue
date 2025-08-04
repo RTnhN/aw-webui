@@ -11,7 +11,7 @@ div
       option(:value='null') None
       option(value='category') Categories
       option(value='bucketType') Bucket Specific
-  details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2
+  details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2(ref="filterDetails")
     summary.p-2
       b Filters
     div.p-2.bg-light.filter-panel
@@ -127,6 +127,12 @@ export default {
       this.getBuckets();
     },
   },
+  mounted() {
+    document.addEventListener('click', this.handleClickOutside, true);
+  },
+  beforeUnmount() {
+    document.removeEventListener('click', this.handleClickOutside, true);
+  },
   methods: {
     async getBuckets() {
       if (!this.daterange) return;
@@ -174,6 +180,14 @@ export default {
     },
     clearAllClients() {
       this.filter_clients = [];
+    },
+    handleClickOutside(event: MouseEvent) {
+      const details = this.$refs.filterDetails as HTMLElement | undefined;
+      if (details && details.hasAttribute('open')) {
+        if (!details.contains(event.target as Node)) {
+          details.removeAttribute('open');
+        }
+      }
     },
   },
 };
