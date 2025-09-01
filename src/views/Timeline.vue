@@ -176,8 +176,14 @@ export default {
       this.clients = [...new Set(this.all_buckets.map(a => a.client))];
 
       // ensure filters are valid for current options
-      this.filter_hostnames = this.filter_hostnames.filter(h => this.hosts.includes(h));
-      this.filter_clients = this.filter_clients.filter(c => this.clients.includes(c));
+      const validHosts = this.filter_hostnames.filter(h => this.hosts.includes(h));
+      if (!_.isEqual(validHosts, this.filter_hostnames)) {
+        this.filter_hostnames = validHosts;
+      }
+      const validClients = this.filter_clients.filter(c => this.clients.includes(c));
+      if (!_.isEqual(validClients, this.filter_clients)) {
+        this.filter_clients = validClients;
+      }
 
       // default select all only once if no saved filters
       if (this.firstLoad) {
