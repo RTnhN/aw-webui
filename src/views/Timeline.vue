@@ -15,6 +15,7 @@ div
     details.d-inline-block.bg-light.mr-2.p-2(ref="filterDetails")
       summary
         | Host and Client Filters
+        icon(name="filter" v-if="filtersApplied" class="fa-icon")
       div.p-2.bg-light.filter-panel
         // Host filter controls
         .filter-group.mb-2
@@ -75,10 +76,23 @@ div
 import _ from 'lodash';
 import { useSettingsStore } from '~/stores/settings';
 import { useBucketsStore } from '~/stores/buckets';
+import 'vue-awesome/icons/filter';
 
 export default {
   name: 'Timeline',
   data() {
+    const savedHosts = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_hostnames')) ||
+        '[]'
+    );
+    const savedClients = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_clients')) ||
+        '[]'
+    );
+    const savedDuration = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_duration')) ||
+        'null'
+    );
     return {
       all_buckets: null as any[] | null,
       hosts: null as string[] | null,
@@ -86,10 +100,10 @@ export default {
       clients: null as string[] | null,
       daterange: null as any,
       maxDuration: 31 * 24 * 60 * 60,
-      filter_hostnames: [] as string[],
-      filter_clients: [] as string[],
+      filter_hostnames: savedHosts as string[],
+      filter_clients: savedClients as string[],
       firstLoad: true,
-      filter_duration: null,
+      filter_duration: savedDuration as number | null,
       swimlane: null,
       updateTimelineWindow: true,
     };
@@ -102,6 +116,13 @@ export default {
     num_events(): number {
       return _.sumBy(this.buckets || [], 'events.length');
     },
+    filtersApplied(): boolean {
+      if (!this.hosts || !this.clients) return false;
+      const allHosts = this.filter_hostnames.length === this.hosts.length;
+      const allClients = this.filter_clients.length === this.clients.length;
+      const durationDefault = this.filter_duration === null;
+      return !(allHosts && allClients && durationDefault);
+    },
   },
   watch: {
     daterange() {
@@ -110,14 +131,23 @@ export default {
     },
     filter_hostnames() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_hostnames', JSON.stringify(this.filter_hostnames));
+      }
       this.getBuckets();
     },
     filter_clients() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_clients', JSON.stringify(this.filter_clients));
+      }
       this.getBuckets();
     },
     filter_duration() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_duration', JSON.stringify(this.filter_duration));
+      }
       this.getBuckets();
     },
     swimlane() {
@@ -145,10 +175,18 @@ export default {
       this.hosts = [...new Set(this.all_buckets.map(a => a.hostname))];
       this.clients = [...new Set(this.all_buckets.map(a => a.client))];
 
-      // default select all only once
+      // ensure filters are valid for current options
+      this.filter_hostnames = this.filter_hostnames.filter(h => this.hosts.includes(h));
+      this.filter_clients = this.filter_clients.filter(c => this.clients.includes(c));
+
+      // default select all only once if no saved filters
       if (this.firstLoad) {
-        this.filter_hostnames = [...(this.hosts || [])];
-        this.filter_clients = [...(this.clients || [])];
+        if (this.filter_hostnames.length === 0) {
+          this.filter_hostnames = [...(this.hosts || [])];
+        }
+        if (this.filter_clients.length === 0) {
+          this.filter_clients = [...(this.clients || [])];
+        }
         this.firstLoad = false;
       }
 
