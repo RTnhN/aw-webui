@@ -88,6 +88,10 @@ export default {
       (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_clients')) ||
         '[]'
     );
+    const savedDuration = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_duration')) ||
+        'null'
+    );
     return {
       all_buckets: null as any[] | null,
       hosts: null as string[] | null,
@@ -98,7 +102,7 @@ export default {
       filter_hostnames: savedHosts as string[],
       filter_clients: savedClients as string[],
       firstLoad: true,
-      filter_duration: null,
+      filter_duration: savedDuration as number | null,
       swimlane: null,
       updateTimelineWindow: true,
     };
@@ -115,7 +119,8 @@ export default {
       if (!this.hosts || !this.clients) return false;
       const allHosts = this.filter_hostnames.length === this.hosts.length;
       const allClients = this.filter_clients.length === this.clients.length;
-      return !(allHosts && allClients);
+      const durationDefault = this.filter_duration === null;
+      return !(allHosts && allClients && durationDefault);
     },
   },
   watch: {
@@ -139,6 +144,9 @@ export default {
     },
     filter_duration() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_duration', JSON.stringify(this.filter_duration));
+      }
       this.getBuckets();
     },
     swimlane() {
