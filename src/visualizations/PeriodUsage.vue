@@ -1,15 +1,31 @@
 <template lang="pug">
-svg
+div.periodusage-container.position-relative
+  svg(ref="svg", v-show="!loading")
+  div.spinner-overlay.d-flex.justify-content-center.align-items-center(v-if="loading")
+    icon(name="spinner" pulse)
 </template>
 
 <style scoped lang="scss">
 @import '../style/globals';
 
-svg {
+.periodusage-container {
   width: 100%;
   height: 40pt;
   border: 1px solid $lightBorderColor;
   border-radius: 0.5em;
+}
+
+svg {
+  width: 100%;
+  height: 100%;
+}
+
+.spinner-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 </style>
 
@@ -18,6 +34,7 @@ svg {
 //       Code should generally go in the framework-independent file.
 
 import periodusage from './periodusage';
+import 'vue-awesome/icons/spinner';
 
 export default {
   name: 'aw-periodusage',
@@ -26,17 +43,33 @@ export default {
       type: Array,
     },
   },
+  data() {
+    return {
+      loading: true,
+    };
+  },
   watch: {
-    periodusage_arr: function () {
-      periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+    periodusage_arr: {
+      handler() {
+        if (this.periodusage_arr) {
+          periodusage.update(
+            this.$refs.svg as SVGElement,
+            this.periodusage_arr,
+            this.onPeriodClicked
+          );
+          this.loading = false;
+        } else {
+          this.loading = true;
+        }
+      },
+      immediate: true,
     },
   },
-  mounted: function () {
-    periodusage.create(this.$el);
-    periodusage.set_status(this.$el, 'Loading...');
+  mounted() {
+    periodusage.create(this.$refs.svg as SVGElement);
   },
   methods: {
-    onPeriodClicked: function (period) {
+    onPeriodClicked(period: string) {
       this.$emit('update', period);
     },
   },

@@ -278,6 +278,9 @@ export default {
       return `/activity/${this.host}/${this.periodLength}`;
     },
     periodusage: function () {
+      if (Object.keys(this.activityStore.active.history).length === 0) {
+        return null;
+      }
       return this.activityStore.getActiveHistoryAroundTimeperiod(this.timeperiod);
     },
     timeperiod: function () {

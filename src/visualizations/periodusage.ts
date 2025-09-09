@@ -4,6 +4,11 @@ import moment from 'moment';
 
 import { seconds_to_duration, get_hour_offset } from '../util/time.ts';
 
+interface CategoryEvent {
+  duration?: number;
+  timestamp: number | string;
+}
+
 function create(svg_elem: SVGElement) {
   // Clear element
   svg_elem.innerHTML = '';
@@ -29,7 +34,11 @@ const diagramcolor = '#aaa';
 const diagramcolor_selected = '#fc5';
 const diagramcolor_focused = '#adf';
 
-function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
+function update(
+  svg_elem: SVGElement,
+  usage_arr: CategoryEvent[][],
+  onPeriodClicked: (period: string) => void
+) {
   const dateformat = 'YYYY-MM-DD';
 
   // No apps, sets status to "No data"
@@ -40,13 +49,13 @@ function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   svg_elem.innerHTML = '';
   const svg = d3.select(svg_elem);
 
-  function get_usage_time(day_events) {
+  function get_usage_time(day_events: CategoryEvent[]) {
     // Sum the duration of all events for the given day. The events now
     // represent category durations rather than AFK status events.
     if (!day_events || day_events.length === 0) {
       return 0;
     }
-    return _.sumBy(day_events, e => e.duration || 0);
+    return _.sumBy(day_events, (e: CategoryEvent) => e.duration || 0);
   }
 
   const usage_times = usage_arr.map(day_events => get_usage_time(day_events));
