@@ -332,7 +332,7 @@ export default {
       this.refresh();
     },
     timeperiod: function () {
-      this.refresh();
+      this.refresh(false, false);
     },
     filter_category: function () {
       this.refresh();
@@ -412,8 +412,10 @@ export default {
       }
     },
 
-    refresh: async function (force) {
-      this.periodusageLoading = true;
+    refresh: async function (force = false, showLoading = true) {
+      if (showLoading) {
+        this.periodusageLoading = true;
+      }
       const queryOptions: QueryOptions = {
         timeperiod: this.timeperiod,
         host: this.host,
@@ -428,7 +430,9 @@ export default {
         await this.activityStore.ensure_loaded(queryOptions);
         await this.activityStore.query_category_history(queryOptions);
       } finally {
-        this.periodusageLoading = false;
+        if (showLoading) {
+          this.periodusageLoading = false;
+        }
       }
     },
 
