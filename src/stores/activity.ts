@@ -99,6 +99,7 @@ interface State {
     available: boolean;
     by_period: IEvent[];
     top: IEvent[];
+    history: Record<any, IEvent[]>;
   };
 
   active: {
@@ -165,6 +166,7 @@ export const useActivityStore = defineStore('activity', {
       available: false,
       by_period: [],
       top: [],
+      history: {},
     },
 
     active: {
@@ -211,6 +213,18 @@ export const useActivityStore = defineStore('activity', {
           }
         });
         return _history;
+      };
+    },
+    getCategoryHistoryAroundTimeperiod(this: State) {
+      return (timeperiod: TimePeriod): IEvent[][] => {
+        const periods = timeperiodStrsAroundTimeperiod(timeperiod);
+        return periods.map(tp => {
+          if (_.has(this.category.history, tp)) {
+            return this.category.history[tp];
+          } else {
+            return [];
+          }
+        });
       };
     },
     uncategorizedDuration(this: State): [number, number] | null {
@@ -326,6 +340,7 @@ export const useActivityStore = defineStore('activity', {
       this.query_browser_completed({});
       this.query_editor_completed({});
       this.query_category_time_by_period_completed({});
+      this.query_category_history_completed({});
     },
 
     async query_multidevice_full(
@@ -534,6 +549,54 @@ export const useActivityStore = defineStore('activity', {
       this.query_category_time_by_period_completed({ by_period });
     },
 
+    async query_category_history({
+      timeperiod,
+      filter_categories,
+      filter_afk,
+      include_stopwatch,
+      always_active_pattern,
+    }: QueryOptions) {
+      const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(
+        period => new Date(period.split('/')[0]) < new Date()
+      );
+
+      let data = [];
+      for (const period of periods) {
+        const isAndroid = this.buckets.android[0] !== undefined;
+        const categories = useCategoryStore().classes_for_query;
+        const query = queries.categoryQuery({
+          bid_browsers: this.buckets.browser,
+          bid_stopwatch:
+            include_stopwatch && this.buckets.stopwatch.length > 0
+              ? this.buckets.stopwatch[0]
+              : undefined,
+          categories,
+          filter_categories,
+          filter_afk,
+          always_active_pattern,
+          ...(isAndroid
+            ? {
+                bid_android: this.buckets.android[0],
+              }
+            : {
+                bid_afk: this.buckets.afk[0],
+                bid_window: this.buckets.window[0],
+              }),
+        });
+        const result = await getClient().query([period], query, {
+          verbose: true,
+          name: 'categoryHistory',
+        });
+        data = data.concat(result);
+      }
+
+      const historyMap = _.zipObject(
+        periods,
+        data.map(d => d.cat_events || [])
+      );
+      this.query_category_history_completed({ history: historyMap });
+    },
+
     async query_active_history_android({ timeperiod }: QueryOptions) {
       const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(tp_str => {
         return !_.includes(this.active.history, tp_str);
@@ -687,6 +750,7 @@ export const useActivityStore = defineStore('activity', {
 
       this.category.top = null;
       this.category.by_period = null;
+      this.category.history = {};
 
       this.active.duration = null;
 
@@ -748,6 +812,10 @@ export const useActivityStore = defineStore('activity', {
 
     query_category_time_by_period_completed(this: State, { by_period } = { by_period: [] }) {
       this.category.by_period = by_period;
+    },
+
+    query_category_history_completed(this: State, { history: historyMap } = { history: {} }) {
+      this.category.history = historyMap;
     },
   },
 });

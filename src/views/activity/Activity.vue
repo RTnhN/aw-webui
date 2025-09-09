@@ -72,7 +72,7 @@ div
         b-form-select(v-model="filter_category", :options="categoryStore.category_select(true)" size="sm")
 
 
-  aw-periodusage.mt-2(:periodusage_arr="periodusage", @update="setDate")
+  aw-periodusage.mt-2(:periodusage_arr="periodusage", :loading="periodusageLoading", @update="setDate")
 
   aw-uncategorized-notification()
 
@@ -203,6 +203,7 @@ export default {
       include_stopwatch: false,
       filter_afk: true,
       new_view: {},
+      periodusageLoading: false,
     };
   },
   computed: {
@@ -278,7 +279,7 @@ export default {
       return `/activity/${this.host}/${this.periodLength}`;
     },
     periodusage: function () {
-      return this.activityStore.getActiveHistoryAroundTimeperiod(this.timeperiod);
+      return this.activityStore.getCategoryHistoryAroundTimeperiod(this.timeperiod);
     },
     timeperiod: function () {
       const settingsStore = useSettingsStore();
@@ -412,6 +413,7 @@ export default {
     },
 
     refresh: async function (force) {
+      this.periodusageLoading = true;
       const queryOptions: QueryOptions = {
         timeperiod: this.timeperiod,
         host: this.host,
@@ -422,7 +424,12 @@ export default {
         filter_categories: this.filter_categories,
         always_active_pattern: this.always_active_pattern,
       };
-      await this.activityStore.ensure_loaded(queryOptions);
+      try {
+        await this.activityStore.ensure_loaded(queryOptions);
+        await this.activityStore.query_category_history(queryOptions);
+      } finally {
+        this.periodusageLoading = false;
+      }
     },
 
     load_demo: async function () {

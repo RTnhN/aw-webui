@@ -25,15 +25,32 @@ export default {
     periodusage_arr: {
       type: Array,
     },
+    loading: {
+      type: Boolean,
+      default: false,
+    },
   },
   watch: {
     periodusage_arr: function () {
-      periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+      if (!this.loading) {
+        periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+      }
+    },
+    loading: function (val) {
+      if (val) {
+        periodusage.set_status(this.$el, 'Loading...');
+      } else {
+        periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+      }
     },
   },
   mounted: function () {
     periodusage.create(this.$el);
-    periodusage.set_status(this.$el, 'Loading...');
+    if (this.loading) {
+      periodusage.set_status(this.$el, 'Loading...');
+    } else {
+      periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+    }
   },
   methods: {
     onPeriodClicked: function (period) {
