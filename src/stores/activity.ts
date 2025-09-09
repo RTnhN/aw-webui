@@ -393,40 +393,74 @@ export const useActivityStore = defineStore('activity', {
       this.query_editor_completed(data[0]);
     },
 
-    async query_active_history({ timeperiod, ...query_options }: QueryOptions) {
+    async query_active_history({
+      timeperiod,
+      host,
+      filter_categories,
+      filter_afk,
+      include_stopwatch,
+      include_audible,
+      always_active_pattern,
+    }: QueryOptions) {
       const settingsStore = useSettingsStore();
       const bucketsStore = useBucketsStore();
+      const categoryStore = useCategoryStore();
+      const categories = categoryStore.classes_for_query;
+
       // Filter out periods that are already in the history, and that are in the future
       const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(tp_str => {
-        return (
-          !_.includes(this.active.history, tp_str) && new Date(tp_str.split('/')[0]) < new Date()
-        );
+        return !_.has(this.active.history, tp_str) && new Date(tp_str.split('/')[0]) < new Date();
       });
-      let afk_buckets: string[] = [];
+
+      let query: string[];
       if (settingsStore.useMultidevice) {
         // get all hostnames that qualify for the multidevice query
         const hostnames = bucketsStore.hosts.filter(
-          // require that the host has afk buckets,
-          // and that the host is not a fakedata host,
-          // unless we're explicitly querying fakedata
-          host =>
-            host &&
-            bucketsStore.bucketsAFK(host).length > 0 &&
-            (!host.startsWith('fakedata') || query_options.host.startsWith('fakedata'))
+          hostn =>
+            hostn &&
+            bucketsStore.bucketsWindow(hostn).length > 0 &&
+            bucketsStore.bucketsAFK(hostn).length > 0 &&
+            (!hostn.startsWith('fakedata') || host.startsWith('fakedata'))
         );
-        // get all afk buckets for all hosts
-        afk_buckets = _.flatten(hostnames.map(bucketsStore.bucketsAFK));
+        query = queries.categoryQuery({
+          hosts: hostnames,
+          categories,
+          filter_categories,
+          filter_afk,
+          always_active_pattern,
+          include_audible,
+          bid_browsers: this.buckets.browser,
+          bid_stopwatch:
+            include_stopwatch && this.buckets.stopwatch.length > 0
+              ? this.buckets.stopwatch[0]
+              : undefined,
+          host_params: {},
+        });
       } else {
-        afk_buckets = [this.buckets.afk[0]];
+        query = queries.categoryQuery({
+          bid_window: this.buckets.window[0],
+          bid_afk: this.buckets.afk[0],
+          bid_browsers: this.buckets.browser,
+          bid_stopwatch:
+            include_stopwatch && this.buckets.stopwatch.length > 0
+              ? this.buckets.stopwatch[0]
+              : undefined,
+          filter_afk,
+          include_audible,
+          categories,
+          filter_categories,
+          always_active_pattern,
+        });
       }
-      const query = queries.activityQuery(afk_buckets);
+
       const data = await getClient().query(periods, query, {
-        name: 'activityQuery',
+        name: 'categoryQuery',
         verbose: true,
       });
+
       const active_history = _.zipObject(
         periods,
-        _.map(data, pair => _.filter(pair, e => e.data.status == 'not-afk'))
+        data.map(res => res.cat_events || [])
       );
       this.query_active_history_completed({ active_history });
     },
@@ -534,22 +568,25 @@ export const useActivityStore = defineStore('activity', {
       this.query_category_time_by_period_completed({ by_period });
     },
 
-    async query_active_history_android({ timeperiod }: QueryOptions) {
+    async query_active_history_android({ timeperiod, filter_categories }: QueryOptions) {
       const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(tp_str => {
-        return !_.includes(this.active.history, tp_str);
+        return !_.has(this.active.history, tp_str);
       });
+      const categoryStore = useCategoryStore();
+      const categories = categoryStore.classes_for_query;
       const data = await getClient().query(
         periods,
-        queries.activityQueryAndroid(this.buckets.android[0])
+        queries.categoryQuery({
+          bid_android: this.buckets.android[0],
+          categories,
+          filter_categories,
+        })
       );
-      const active_history = _.zipObject(periods, data);
-      const active_history_events = _.mapValues(
-        active_history,
-        (duration: number, key): [IEvent] => {
-          return [{ timestamp: key.split('/')[0], duration, data: { status: 'not-afk' } }];
-        }
+      const active_history = _.zipObject(
+        periods,
+        data.map(res => res.cat_events || [])
       );
-      this.query_active_history_completed({ active_history: active_history_events });
+      this.query_active_history_completed({ active_history });
     },
 
     set_available(this: State) {

@@ -41,8 +41,12 @@ function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   const svg = d3.select(svg_elem);
 
   function get_usage_time(day_events) {
-    const day_event = _.head(_.filter(day_events, e => e.data.status == 'not-afk'));
-    return day_event != undefined ? day_event.duration : 0;
+    // Sum the duration of all events for the given day. The events now
+    // represent category durations rather than AFK status events.
+    if (!day_events || day_events.length === 0) {
+      return 0;
+    }
+    return _.sumBy(day_events, e => e.duration || 0);
   }
 
   const usage_times = usage_arr.map(day_events => get_usage_time(day_events));
