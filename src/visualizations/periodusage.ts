@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 import _ from 'lodash';
 import moment from 'moment';
 
+import { IEvent } from '~/util/interfaces';
 import { seconds_to_duration, get_hour_offset } from '../util/time.ts';
 
 function create(svg_elem: SVGElement) {
@@ -29,7 +30,11 @@ const diagramcolor = '#aaa';
 const diagramcolor_selected = '#fc5';
 const diagramcolor_focused = '#adf';
 
-function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
+function update(
+  svg_elem: SVGElement,
+  usage_arr: IEvent[][],
+  onPeriodClicked: (period: string) => void
+) {
   const dateformat = 'YYYY-MM-DD';
 
   // No apps, sets status to "No data"
@@ -40,12 +45,11 @@ function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   svg_elem.innerHTML = '';
   const svg = d3.select(svg_elem);
 
-  function get_usage_time(day_events) {
-    const day_event = _.head(_.filter(day_events, e => e.data.status == 'not-afk'));
-    return day_event != undefined ? day_event.duration : 0;
+  function get_usage_time(day_events: IEvent[]) {
+    return _.sumBy(day_events, e => e.duration);
   }
 
-  const usage_times = usage_arr.map(day_events => get_usage_time(day_events));
+  const usage_times = usage_arr.map((day_events: IEvent[]) => get_usage_time(day_events));
   let longest_usage = Math.max.apply(null, usage_times);
   // Avoid division by zero
   if (longest_usage <= 0) {

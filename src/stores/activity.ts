@@ -97,8 +97,8 @@ interface State {
 
   category: {
     available: boolean;
-    by_period: IEvent[];
-    top: IEvent[];
+    by_period: Record<string, { cat_events: IEvent[] }> | null;
+    top: IEvent[] | null;
   };
 
   active: {
@@ -163,7 +163,7 @@ export const useActivityStore = defineStore('activity', {
 
     category: {
       available: false,
-      by_period: [],
+      by_period: {},
       top: [],
     },
 
@@ -211,6 +211,25 @@ export const useActivityStore = defineStore('activity', {
           }
         });
         return _history;
+      };
+    },
+    getCategoryHistoryAroundTimeperiod(this: State) {
+      return (
+        timeperiod: TimePeriod,
+        category: string[]
+      ): IEvent[][] | null => {
+        if (!this.category.by_period) {
+          return null;
+        }
+        const periods = timeperiodStrsAroundTimeperiod(timeperiod);
+        return periods.map(tp => {
+          const data = this.category.by_period[tp];
+          if (!data) {
+            return [];
+          }
+          const evt = data.cat_events.find(e => _.isEqual(e.data['$category'], category));
+          return evt ? [evt] : [];
+        });
       };
     },
     uncategorizedDuration(this: State): [number, number] | null {
@@ -746,7 +765,10 @@ export const useActivityStore = defineStore('activity', {
       };
     },
 
-    query_category_time_by_period_completed(this: State, { by_period } = { by_period: [] }) {
+    query_category_time_by_period_completed(
+      this: State,
+      { by_period } = { by_period: {} as Record<string, { cat_events: IEvent[] }> }
+    ) {
       this.category.by_period = by_period;
     },
   },

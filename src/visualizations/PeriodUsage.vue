@@ -17,18 +17,28 @@ svg {
 // NOTE: This is just a Vue.js component wrapper for periodusage.js
 //       Code should generally go in the framework-independent file.
 
+import { PropType } from 'vue';
+import { IEvent } from '~/util/interfaces';
 import periodusage from './periodusage';
 
 export default {
   name: 'aw-periodusage',
   props: {
     periodusage_arr: {
-      type: Array,
+      type: Array as PropType<IEvent[][] | null>,
+      default: null,
     },
   },
   watch: {
-    periodusage_arr: function () {
-      periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+    periodusage_arr: {
+      handler() {
+        if (!this.periodusage_arr) {
+          periodusage.set_status(this.$el, 'Loading...');
+        } else {
+          periodusage.update(this.$el, this.periodusage_arr, this.onPeriodClicked);
+        }
+      },
+      immediate: true,
     },
   },
   mounted: function () {

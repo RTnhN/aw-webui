@@ -278,7 +278,14 @@ export default {
       return `/activity/${this.host}/${this.periodLength}`;
     },
     periodusage: function () {
-      return this.activityStore.getActiveHistoryAroundTimeperiod(this.timeperiod);
+      if (this.filter_category) {
+        return this.activityStore.getCategoryHistoryAroundTimeperiod(
+          this.timeperiod,
+          this.filter_category
+        );
+      } else {
+        return this.activityStore.getActiveHistoryAroundTimeperiod(this.timeperiod);
+      }
     },
     timeperiod: function () {
       const settingsStore = useSettingsStore();
