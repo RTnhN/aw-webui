@@ -279,7 +279,11 @@ export default {
       return `/activity/${this.host}/${this.periodLength}`;
     },
     periodusage: function () {
-      return this.activityStore.getCategoryHistoryAroundTimeperiod(this.timeperiod);
+      return this.activityStore.getCategoryHistoryAroundTimeperiod(
+        this.timeperiod,
+        this.host,
+        this.filter_category
+      );
     },
     timeperiod: function () {
       const settingsStore = useSettingsStore();

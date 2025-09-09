@@ -39,6 +39,11 @@ function timeperiodStrsAroundTimeperiod(timeperiod: TimePeriod): string[] {
   return timeperiodsAroundTimeperiod(timeperiod).map(timeperiodToStr);
 }
 
+function categoryHistoryKey(host: string, filter_category: string[] | null): string {
+  const cat = filter_category ? filter_category.join('/') : 'all';
+  return `${host}|${cat}`;
+}
+
 function colorCategories(events: IEvent[]): IEvent[] {
   // Set $color for categories
   const categoryStore = useCategoryStore();
@@ -99,7 +104,7 @@ interface State {
     available: boolean;
     by_period: IEvent[];
     top: IEvent[];
-    history: Record<any, IEvent[]>;
+    history: Record<string, Record<string, IEvent[]>>;
   };
 
   active: {
@@ -166,7 +171,7 @@ export const useActivityStore = defineStore('activity', {
       available: false,
       by_period: [],
       top: [],
-      history: {},
+      history: {} as Record<string, Record<string, IEvent[]>>,
     },
 
     active: {
@@ -216,11 +221,17 @@ export const useActivityStore = defineStore('activity', {
       };
     },
     getCategoryHistoryAroundTimeperiod(this: State) {
-      return (timeperiod: TimePeriod): IEvent[][] => {
+      return (
+        timeperiod: TimePeriod,
+        host: string,
+        filter_category: string[] | null
+      ): IEvent[][] => {
+        const key = categoryHistoryKey(host, filter_category);
         const periods = timeperiodStrsAroundTimeperiod(timeperiod);
+        const historyForKey = this.category.history[key] || {};
         return periods.map(tp => {
-          if (_.has(this.category.history, tp)) {
-            return this.category.history[tp];
+          if (_.has(historyForKey, tp)) {
+            return historyForKey[tp];
           } else {
             return [];
           }
@@ -555,10 +566,24 @@ export const useActivityStore = defineStore('activity', {
       filter_afk,
       include_stopwatch,
       always_active_pattern,
+      host,
     }: QueryOptions) {
-      const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(
-        period => new Date(period.split('/')[0]) < new Date()
-      );
+      const filter_category = filter_categories ? filter_categories[0] : null;
+      const key = categoryHistoryKey(host, filter_category);
+      if (!this.category.history[key]) {
+        this.category.history[key] = {};
+      }
+
+      const periods = timeperiodStrsAroundTimeperiod(timeperiod).filter(period => {
+        const [startStr, endStr] = period.split('/');
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const now = new Date();
+        if (start >= now) return false; // skip future periods
+        const cached = this.category.history[key][period];
+        if (cached && end <= now) return false; // skip cached past periods
+        return true;
+      });
 
       let data = [];
       for (const period of periods) {
@@ -594,7 +619,7 @@ export const useActivityStore = defineStore('activity', {
         periods,
         data.map(d => d.cat_events || [])
       );
-      this.query_category_history_completed({ history: historyMap });
+      this.query_category_history_completed({ history: historyMap, key });
     },
 
     async query_active_history_android({ timeperiod }: QueryOptions) {
@@ -750,7 +775,6 @@ export const useActivityStore = defineStore('activity', {
 
       this.category.top = null;
       this.category.by_period = null;
-      this.category.history = {};
 
       this.active.duration = null;
 
@@ -814,8 +838,21 @@ export const useActivityStore = defineStore('activity', {
       this.category.by_period = by_period;
     },
 
-    query_category_history_completed(this: State, { history: historyMap } = { history: {} }) {
-      this.category.history = historyMap;
+    query_category_history_completed(
+      this: State,
+      { history: historyMap, key }: { history?: Record<string, IEvent[]>; key?: string } = {}
+    ) {
+      if (key) {
+        if (!this.category.history[key]) {
+          this.category.history[key] = {};
+        }
+        this.category.history[key] = {
+          ...this.category.history[key],
+          ...(historyMap || {}),
+        };
+      } else {
+        this.category.history = {};
+      }
     },
   },
 });
