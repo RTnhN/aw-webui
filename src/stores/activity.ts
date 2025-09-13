@@ -230,10 +230,12 @@ export const useActivityStore = defineStore('activity', {
         const periods = timeperiodStrsAroundTimeperiod(timeperiod);
         const historyForKey = this.category.history[key] || {};
         return periods.map(tp => {
-          if (_.has(historyForKey, tp)) {
-            return historyForKey[tp];
+          const events = historyForKey[tp] || [];
+          if (events.length > 0) {
+            return events;
           } else {
-            return [];
+            // Add zero-duration placeholder so period columns always have a date
+            return [{ timestamp: moment(tp.split('/')[0]).format(), duration: 0, data: {} }];
           }
         });
       };
