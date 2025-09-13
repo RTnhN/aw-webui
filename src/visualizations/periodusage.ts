@@ -32,7 +32,7 @@ const diagramcolor_focused = '#adf';
 function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   const dateformat = 'YYYY-MM-DD';
 
-  // No apps, sets status to "No data"
+  // No data, sets status to "No data"
   if (usage_arr.length <= 0) {
     set_status(svg_elem, 'No data');
     return;
@@ -40,12 +40,11 @@ function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   svg_elem.innerHTML = '';
   const svg = d3.select(svg_elem);
 
-  function get_usage_time(day_events) {
-    const day_event = _.head(_.filter(day_events, e => e.data.status == 'not-afk'));
-    return day_event != undefined ? day_event.duration : 0;
+  function get_usage_time(day) {
+    return _.sumBy(day.events, 'duration');
   }
 
-  const usage_times = usage_arr.map(day_events => get_usage_time(day_events));
+  const usage_times = usage_arr.map(day => get_usage_time(day));
   let longest_usage = Math.max.apply(null, usage_times);
   // Avoid division by zero
   if (longest_usage <= 0) {
@@ -56,13 +55,12 @@ function update(svg_elem: SVGElement, usage_arr, onPeriodClicked) {
   const width = 100 / usage_arr.length - padding;
   const center_elem = Math.floor(usage_arr.length / 2);
 
-  _.each(usage_arr, (events, i: number) => {
-    const usage_time = get_usage_time(events);
+  _.each(usage_arr, (day, i: number) => {
+    const usage_time = get_usage_time(day);
     const height = 85 * (usage_time / longest_usage);
     let date = '';
-    if (events.length > 0) {
-      // slice off so it's only the day
-      date = moment(events[0].timestamp).subtract(get_hour_offset(), 'hours').format(dateformat);
+    if (day.period) {
+      date = moment(day.period.split('/')[0]).subtract(get_hour_offset(), 'hours').format(dateformat);
     }
     const color = i === center_elem ? diagramcolor_selected : diagramcolor;
     const offset = 50;
