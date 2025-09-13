@@ -279,6 +279,9 @@ export default {
       return `/activity/${this.host}/${this.periodLength}`;
     },
     periodusage: function () {
+      // Touch the category history to ensure reactivity when it updates
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      this.activityStore.category.history;
       return this.activityStore.getCategoryHistoryAroundTimeperiod(
         this.timeperiod,
         this.host,
