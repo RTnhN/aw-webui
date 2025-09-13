@@ -570,7 +570,9 @@ export const useActivityStore = defineStore('activity', {
       always_active_pattern,
       host,
     }: QueryOptions) {
-      const filter_category = filter_categories ? filter_categories[0] : null;
+      // Fall back to the last used filter_categories if the caller didn't supply one
+      const categoriesFilter = filter_categories ?? this.query_options?.filter_categories ?? null;
+      const filter_category = categoriesFilter ? categoriesFilter[0] : null;
       const key = categoryHistoryKey(host, filter_category);
       if (!this.category.history[key]) {
         this.category.history[key] = {};
@@ -598,7 +600,7 @@ export const useActivityStore = defineStore('activity', {
               ? this.buckets.stopwatch[0]
               : undefined,
           categories,
-          filter_categories,
+          filter_categories: categoriesFilter,
           filter_afk,
           always_active_pattern,
           ...(isAndroid
