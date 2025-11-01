@@ -439,11 +439,16 @@ export const useActivityStore = defineStore('activity', {
       dontQueryInactive,
       always_active_pattern,
     }: QueryOptions & { dontQueryInactive: boolean }) {
-      // TODO: Needs to be adapted for Android
       let periods: string[];
       const count = timeperiod.length[0];
       const res = timeperiod.length[1];
-      if (res.startsWith('day') && count == 1) {
+
+      // Handle hourly timeperiods
+      if (res.startsWith('hour')) {
+        // For hour periods (including custom ranges like 1.5 hours), 
+        // just query the exact timeperiod as a single period
+        periods = [timeperiodToStr(timeperiod)];
+      } else if (res.startsWith('day') && count == 1) {
         // If timeperiod is a single day, we query the individual hours
         periods = timeperiodsStrsHoursOfPeriod(timeperiod);
       } else if (
@@ -473,8 +478,6 @@ export const useActivityStore = defineStore('activity', {
       // Query one period at a time, to avoid timeout on slow queries
       let data = [];
       for (const period of periods) {
-        // Not stable
-        //signal.throwIfAborted();
         if (cancelled) {
           throw signal['reason'] || 'unknown reason';
         }
@@ -498,8 +501,6 @@ export const useActivityStore = defineStore('activity', {
 
         const isAndroid = this.buckets.android[0] !== undefined;
         const categories = useCategoryStore().classes_for_query;
-        // TODO: Clean up call, pass QueryParams in fullDesktopQuery as well
-        // TODO: Unify QueryOptions and QueryParams
         const query = queries.categoryQuery({
           bid_browsers: this.buckets.browser,
           bid_stopwatch:
@@ -512,12 +513,12 @@ export const useActivityStore = defineStore('activity', {
           always_active_pattern,
           ...(isAndroid
             ? {
-                bid_android: this.buckets.android[0],
-              }
+              bid_android: this.buckets.android[0],
+            }
             : {
-                bid_afk: this.buckets.afk[0],
-                bid_window: this.buckets.window[0],
-              }),
+              bid_afk: this.buckets.afk[0],
+              bid_window: this.buckets.window[0],
+            }),
         });
         const result = await getClient().query([period], query, {
           verbose: true,
@@ -528,7 +529,7 @@ export const useActivityStore = defineStore('activity', {
 
       // Zip periods
       let by_period = _.zipObject(periods, data);
-      // Filter out values that are undefined (no longer needed, only used when visualization was progressive (looks buggy))
+      // Filter out values that are undefined
       by_period = _.fromPairs(_.toPairs(by_period).filter(o => o[1]));
 
       this.query_category_time_by_period_completed({ by_period });
