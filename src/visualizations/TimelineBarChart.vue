@@ -115,16 +115,16 @@ export default {
       const count = this.timeperiod_length[0];
       
       // For custom hour ranges, set appropriate y-axis max
-      let suggestedMax = undefined;
+      let max = undefined;
       let stepSize = 1;
       
       if (resolution.startsWith('hour')) {
         // For hour ranges, max should be the duration
-        suggestedMax = count;
+        max = count;
         // Use smaller step size for fractional hours
         stepSize = count < 2 ? 0.25 : 0.5;
       } else if (resolution.startsWith('day')) {
-        suggestedMax = 1;
+        max = 1;
         stepSize = 0.25;
       }
       
@@ -145,7 +145,7 @@ export default {
           y: {
             stacked: true,
             min: 0,
-            suggestedMax: suggestedMax,
+            max: max,
             ticks: {
               callback: hourToTick,
               stepSize: stepSize,

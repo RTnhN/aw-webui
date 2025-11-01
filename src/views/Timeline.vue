@@ -5,55 +5,60 @@ div
   input-timeinterval(v-model="daterange", :defaultDuration="timeintervalDefaultDuration", :maxDuration="maxDuration").mb-3
 
   // blocks
-  div.d-inline-block.border.rounded.p-2.mr-2
-    | Events shown:  {{ num_events }}
-  div.d-inline-block.border.rounded.p-2.mr-2
-    | Swimlanes:  
-    select(v-model="swimlane")
-      option(:value='null') None
-      option(value='category') Categories
-      option(value='bucketType') Bucket Specific
-  details.d-inline-block.bg-light.small.border.rounded.mr-2.px-2
-    summary.p-2
-      b Filters: {{ filter_summary }}
-    div.p-2.bg-light
-      table
-        tr
-          th.pt-2.pr-3
-            label Host:
-          td
-              select(v-model="filter_hostname")
-                option(:value='null') All
-                option(v-for="host in hosts", :value="host") {{ host }}
-        tr
-          th.pt-2.pr-3
-            label Client:
-          td
-            select(v-model="filter_client")
-              option(:value='null') All
-              option(v-for="client in clients", :value="client") {{ client }}
+  div.d-inline-block.border.rounded.mr-2
+    div.d-inline-block.p-2.mr-2
+      | Swimlanes:  
+      select(v-model="swimlane")
+        option(:value='null') None
+        option(value='category') Categories
+        option(value='bucketType') Bucket Specific
+    details.d-inline-block.bg-light.mr-2.p-2(ref="filterDetails")
+      summary
+        | Host and Client Filters
+        icon(name="filter" v-if="filtersApplied" class="fa-icon")
+      div.p-2.bg-light.filter-panel
+        // Host filter controls
+        .filter-group.mb-2
+          label.mb-1.mr-2 Host:
+          .btn-group.mb-1
+            button.btn.btn-sm.btn-link(@click.prevent="selectAllHosts") All
+            button.btn.btn-sm.btn-link(@click.prevent="clearAllHosts") None
+          .checkbox-list.mb-3
+            div(v-for="host in hosts" :key="host")
+              label.d-block
+                input(type="checkbox" :value="host" v-model="filter_hostnames" class="mr-2")
+                | {{ host }}
+        // Client filter controls
+        .filter-group
+          label.mb-1.mr-2 Client:
+          .btn-group.mb-1
+            button.btn.btn-sm.btn-link(@click.prevent="selectAllClients") All
+            button.btn.btn-sm.btn-link(@click.prevent="clearAllClients") None
+          .checkbox-list
+            div(v-for="client in clients" :key="client")
+              label.d-block
+                input(type="checkbox" :value="client" v-model="filter_clients" class="mr-2")
+                | {{ client }}
+    div.d-inline-block.p-2.mr-2
+      | Duration: 
+      select(v-model="filter_duration")
+        option(:value='null') All
+        option(:value='2') 2+ secs
+        option(:value='5') 5+ secs
+        option(:value='10') 10+ secs 
+        option(:value='30') 30+ sec
+        option(:value='1 * 60') 1+ mins
+        option(:value='2 * 60') 2+ mins
+        option(:value='3 * 60') 3+ mins
+        option(:value='10 * 60') 10+ mins
+        option(:value='30 * 60') 30+ mins
+        option(:value='1 * 60 * 60') 1+ hrs
+        option(:value='2 * 60 * 60') 2+ hrs
   div.d-inline-block.border.rounded.p-2.mr-2(v-if="num_events !== 0")
     | Events shown: {{ num_events }}
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
     | No events match selected criteria. Timeline is not updated.
-  div.float-right.small.text-muted.pt-3
-        tr
-          th.pt-2.pr-3
-            label Duration:
-          td
-            select(v-model="filter_duration")
-              option(:value='null') All
-              option(:value='2') 2+ secs
-              option(:value='5') 5+ secs
-              option(:value='10') 10+ secs
-              option(:value='30') 30+ sec
-              option(:value='1 * 60') 1+ mins
-              option(:value='2 * 60') 2+ mins
-              option(:value='3 * 60') 3+ mins
-              option(:value='10 * 60') 10+ mins
-              option(:value='30 * 60') 30+ mins
-              option(:value='1 * 60 * 60') 1+ hrs
-              option(:value='2 * 60 * 60') 2+ hrs
+  
   div(style="float: right; color: #999").d-inline-block.pt-3
     | Drag to pan and scroll to zoom
 
@@ -71,50 +76,52 @@ div
 import _ from 'lodash';
 import { useSettingsStore } from '~/stores/settings';
 import { useBucketsStore } from '~/stores/buckets';
-import { seconds_to_duration } from '~/util/time';
+import 'vue-awesome/icons/filter';
 
 export default {
   name: 'Timeline',
   data() {
+    const savedHosts = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_hostnames')) ||
+        '[]'
+    );
+    const savedClients = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_clients')) ||
+        '[]'
+    );
+    const savedDuration = JSON.parse(
+      (typeof localStorage !== 'undefined' && localStorage.getItem('timeline_filter_duration')) ||
+        'null'
+    );
     return {
-      all_buckets: null,
-      hosts: null,
-      buckets: null,
-      clients: null,
-      daterange: null,
+      all_buckets: null as any[] | null,
+      hosts: null as string[] | null,
+      buckets: null as any[] | null,
+      clients: null as string[] | null,
+      daterange: null as any,
       maxDuration: 31 * 24 * 60 * 60,
-      filter_hostname: null,
-      filter_client: null,
-      filter_duration: null,
+      filter_hostnames: savedHosts as string[],
+      filter_clients: savedClients as string[],
+      firstLoad: true,
+      filter_duration: savedDuration as number | null,
       swimlane: null,
       updateTimelineWindow: true,
     };
   },
   computed: {
-    timeintervalDefaultDuration() {
+    timeintervalDefaultDuration(): number {
       const settingsStore = useSettingsStore();
       return Number(settingsStore.durationDefault);
     },
-    // This does not match the chartData which is rendered in the timeline, as chartData excludes short events.
-    num_events() {
-      return _.sumBy(this.buckets, 'events.length');
+    num_events(): number {
+      return _.sumBy(this.buckets || [], 'events.length');
     },
-    filter_summary() {
-      const desc = [];
-      if (this.filter_hostname) {
-        desc.push(this.filter_hostname);
-      }
-      if (this.filter_client) {
-        desc.push(this.filter_client);
-      }
-      if (this.filter_duration > 0) {
-        desc.push(seconds_to_duration(this.filter_duration));
-      }
-
-      if (desc.length > 0) {
-        return desc.join(', ');
-      }
-      return 'none';
+    filtersApplied(): boolean {
+      if (!this.hosts || !this.clients) return false;
+      const allHosts = this.filter_hostnames.length === this.hosts.length;
+      const allClients = this.filter_clients.length === this.clients.length;
+      const durationDefault = this.filter_duration === null;
+      return !(allHosts && allClients && durationDefault);
     },
   },
   watch: {
@@ -122,16 +129,25 @@ export default {
       this.updateTimelineWindow = true;
       this.getBuckets();
     },
-    filter_hostname() {
+    filter_hostnames() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_hostnames', JSON.stringify(this.filter_hostnames));
+      }
       this.getBuckets();
     },
-    filter_client() {
+    filter_clients() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_clients', JSON.stringify(this.filter_clients));
+      }
       this.getBuckets();
     },
     filter_duration() {
       this.updateTimelineWindow = false;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('timeline_filter_duration', JSON.stringify(this.filter_duration));
+      }
       this.getBuckets();
     },
     swimlane() {
@@ -139,9 +155,15 @@ export default {
       this.getBuckets();
     },
   },
+  mounted() {
+    document.addEventListener('click', this.handleClickOutside, true);
+  },
+  beforeUnmount() {
+    document.removeEventListener('click', this.handleClickOutside, true);
+  },
   methods: {
-    getBuckets: async function () {
-      if (this.daterange == null) return;
+    async getBuckets() {
+      if (!this.daterange) return;
 
       this.all_buckets = Object.freeze(
         await useBucketsStore().getBucketsWithEvents({
@@ -150,21 +172,37 @@ export default {
         })
       );
 
-      this.hosts = this.all_buckets
-        .map(a => a.hostname)
-        .filter((value, index, array) => array.indexOf(value) === index);
-      this.clients = this.all_buckets
-        .map(a => a.client)
-        .filter((value, index, array) => array.indexOf(value) === index);
+      this.hosts = [...new Set(this.all_buckets.map(a => a.hostname))];
+      this.clients = [...new Set(this.all_buckets.map(a => a.client))];
+
+      // ensure filters are valid for current options
+      const validHosts = this.filter_hostnames.filter(h => this.hosts.includes(h));
+      if (!_.isEqual(validHosts, this.filter_hostnames)) {
+        this.filter_hostnames = validHosts;
+      }
+      const validClients = this.filter_clients.filter(c => this.clients.includes(c));
+      if (!_.isEqual(validClients, this.filter_clients)) {
+        this.filter_clients = validClients;
+      }
+
+      // default select all only once if no saved filters
+      if (this.firstLoad) {
+        if (this.filter_hostnames.length === 0) {
+          this.filter_hostnames = [...(this.hosts || [])];
+        }
+        if (this.filter_clients.length === 0) {
+          this.filter_clients = [...(this.clients || [])];
+        }
+        this.firstLoad = false;
+      }
 
       let buckets = this.all_buckets;
-      if (this.filter_hostname) {
-        buckets = _.filter(buckets, b => b.hostname == this.filter_hostname);
+      if (this.filter_hostnames.length) {
+        buckets = buckets.filter(b => this.filter_hostnames.includes(b.hostname));
       }
-      if (this.filter_client) {
-        buckets = _.filter(buckets, b => b.client == this.filter_client);
+      if (this.filter_clients.length) {
+        buckets = buckets.filter(b => this.filter_clients.includes(b.client));
       }
-
       if (this.filter_duration > 0) {
         for (const bucket of buckets) {
           bucket.events = _.filter(bucket.events, e => e.duration >= this.filter_duration);
@@ -172,6 +210,26 @@ export default {
       }
 
       this.buckets = buckets;
+    },
+    selectAllHosts() {
+      this.filter_hostnames = [...(this.hosts || [])];
+    },
+    clearAllHosts() {
+      this.filter_hostnames = [];
+    },
+    selectAllClients() {
+      this.filter_clients = [...(this.clients || [])];
+    },
+    clearAllClients() {
+      this.filter_clients = [];
+    },
+    handleClickOutside(event: MouseEvent) {
+      const details = this.$refs.filterDetails as HTMLElement | undefined;
+      if (details && details.hasAttribute('open')) {
+        if (!details.contains(event.target as Node)) {
+          details.removeAttribute('open');
+        }
+      }
     },
   },
 };
@@ -191,5 +249,21 @@ details[open] summary ~ * {
   top: 2.7em;
   background: white;
   z-index: 100;
+}
+
+.filter-panel {
+  min-width: 250px;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+}
+.filter-group {
+  margin-bottom: 0.5rem;
+}
+.btn-group button {
+  margin-right: 0.5rem;
+  padding: 0;
 }
 </style>
