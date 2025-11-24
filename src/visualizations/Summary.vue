@@ -3,7 +3,7 @@ div
   div.aw-summary-wrapper
     div.aw-summary-container(ref="container")
     div.aw-summary-actions(v-if="categorizeMode && limitedFields.length" :style="{ height: overlayHeight + 'px' }")
-      div.aw-summary-action-row(v-for="(entry, idx) in limitedFields" :key="idx" :style="rowStyle(idx)")
+      div.aw-summary-action-row(v-for="(entry, idx) in limitedFields" :key="idx" v-if="isUncategorized(entry)" :style="rowStyle(idx)")
         div.aw-summary-action-buttons
           b-button.mr-2.btn-xs(variant="success" @click="startCreateRule(entry)")
             | New rule
@@ -182,6 +182,12 @@ export default {
     },
     rowStyle(idx: number) {
       return { top: `${idx * SUMMARY_ENTRY_HEIGHT}px` };
+    },
+    isUncategorized(entry: any) {
+      const cat = entry && entry.data ? entry.data.$category : null;
+      if (!cat || (Array.isArray(cat) && cat.length === 0)) return true;
+      if (Array.isArray(cat)) return cat[0] === 'Uncategorized';
+      return cat === 'Uncategorized';
     },
     entryName(entry: any) {
       return this.namefunc(entry);
