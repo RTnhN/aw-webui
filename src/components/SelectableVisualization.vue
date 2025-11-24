@@ -27,11 +27,13 @@ div
       aw-summary(:fields="activityStore.window.top_apps",
                  :namefunc="e => e.data.app",
                  :colorfunc="e => e.data.app",
+                 :categorize-mode="categorizeEnabled",
                  with_limit)
     div(v-if="type == 'top_titles'")
       aw-summary(:fields="activityStore.window.top_titles",
                  :namefunc="e => e.data.title",
                  :colorfunc="e => e.data.title",
+                 :categorize-mode="categorizeEnabled",
                  with_limit)
     div(v-if="type == 'top_domains'")
       aw-summary(:fields="activityStore.browser.top_domains",
@@ -134,6 +136,7 @@ export default {
     type: String,
     props: Object,
     editable: { type: Boolean, default: true },
+    categorizeMode: { type: Boolean, default: false },
   },
   data: function () {
     return {
@@ -309,6 +312,9 @@ export default {
     },
     isSingleDay: function () {
       return _.isEqual(this.activityStore.query_options.timeperiod.length, [1, 'day']);
+    },
+    categorizeEnabled(): boolean {
+      return this.categorizeMode && (this.type === 'top_apps' || this.type === 'top_titles');
     },
   },
   watch: {

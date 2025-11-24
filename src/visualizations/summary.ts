@@ -9,6 +9,9 @@ import { seconds_to_duration } from '~/util/time';
 import { IEvent } from '~/util/interfaces';
 
 const textColor = '#333';
+export const SUMMARY_BAR_HEIGHT = 46;
+export const SUMMARY_BAR_GAP = 5;
+export const SUMMARY_ENTRY_HEIGHT = SUMMARY_BAR_HEIGHT + SUMMARY_BAR_GAP;
 
 function create(container: HTMLElement) {
   // Clear element
@@ -67,7 +70,7 @@ function update(container: HTMLElement, apps: Entry[]) {
 
     // Variables
     const width = (app.duration / longest_duration) * 100 + '%';
-    const barHeight = 46;
+    const barHeight = SUMMARY_BAR_HEIGHT;
     const textSize = 14;
     const appcolor = app.color || getCategoryColorFromString(app.colorKey || app.name);
     const hovercolor = Color(appcolor).darken(0.1).hex();
@@ -115,9 +118,9 @@ function update(container: HTMLElement, apps: Entry[]) {
       .attr('font-size', textSize - 3 + 'px')
       .attr('fill', '#444');
 
-    curr_y += barHeight + 5;
+    curr_y += barHeight + SUMMARY_BAR_GAP;
   });
-  curr_y -= 5;
+  curr_y -= SUMMARY_BAR_GAP;
 
   svg.attr('height', curr_y);
 

@@ -55,6 +55,10 @@ div
           span.d-none.d-md-inline
             |  Filters
             b-badge(pill, variant="secondary" v-if="filters_set > 0").ml-2 {{ filters_set }}
+        b-button.px-2(:pressed.sync="categorizeMode", :variant="categorizeMode ? 'primary' : 'outline-dark'")
+          icon(name="tags")
+          span.d-none.d-md-inline
+            |  Categorize
         b-button.px-2(@click="refresh(true)", variant="outline-dark")
           icon(name="sync")
           span.d-none.d-md-inline
@@ -108,7 +112,7 @@ div
         b-form-input(v-model="new_view.name")
 
   div
-    router-view
+    router-view(:categorize-mode="categorizeMode")
 
     aw-devonly
       b-btn(id="load-demo", @click="load_demo")
@@ -175,6 +179,7 @@ import 'vue-awesome/icons/times';
 import 'vue-awesome/icons/save';
 import 'vue-awesome/icons/question-circle';
 import 'vue-awesome/icons/filter';
+import 'vue-awesome/icons/tags';
 
 import { useSettingsStore } from '~/stores/settings';
 import { useCategoryStore } from '~/stores/categories';
@@ -210,6 +215,7 @@ export default {
       include_stopwatch: false,
       filter_afk: true,
       new_view: {},
+      categorizeMode: false,
     };
   },
   computed: {
@@ -548,6 +554,9 @@ export default {
     
     setEndTime: function(time) {
       this.endTime = time;
+    },
+    toggleCategorizeMode() {
+      this.categorizeMode = !this.categorizeMode;
     }
   },
 };
