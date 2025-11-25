@@ -9,6 +9,7 @@ import {
   annotate,
   Category,
   Rule,
+  ruleToRegex,
 } from '~/util/classes';
 import { getColorFromCategory } from '~/util/color';
 import { defineStore } from 'pinia';
@@ -190,6 +191,13 @@ export const useCategoryStore = defineStore('categories', {
         cat.rule.regex = pattern;
       } else if (cat.rule.type === 'regex') {
         cat.rule.regex += '|' + pattern;
+      } else if (cat.rule.type === 'regex_list') {
+        const base = ruleToRegex(cat.rule) || '';
+        cat.rule = {
+          type: 'regex',
+          regex: base ? `${base}|${pattern}` : pattern,
+          ignore_case: cat.rule.ignore_case,
+        };
       }
       this.classes_unsaved_changes = true;
     },
