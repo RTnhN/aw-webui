@@ -257,18 +257,27 @@ export default {
       const parts: string[] = [];
       let current = '';
       let escaping = false;
+      let inCharClass = false;
       for (const ch of pattern) {
-        if (ch === '\\' && !escaping) {
+        if (escaping) {
+          current += ch;
+          escaping = false;
+          continue;
+        }
+        if (ch === '\\') {
           escaping = true;
           current += ch;
           continue;
         }
-        if (ch === '|' && !escaping) {
+        if (ch === '[') {
+          inCharClass = true;
+        } else if (ch === ']' && inCharClass) {
+          inCharClass = false;
+        } else if (ch === '|' && !inCharClass) {
           parts.push(current);
           current = '';
           continue;
         }
-        escaping = false;
         current += ch;
       }
       parts.push(current);
