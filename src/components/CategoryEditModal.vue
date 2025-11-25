@@ -214,7 +214,7 @@ export default {
       const inherit_score = !score;
       const rule = _.cloneDeep(cat.rule);
       if (rule.type === 'regex') {
-        rule.regex_list = rule.regex ? rule.regex.split('|') : [];
+        rule.regex_list = rule.regex ? this.splitRegexIntoList(rule.regex) : [];
       }
       this.editing = {
         id: cat.id,
@@ -231,7 +231,7 @@ export default {
       this.ensureRegexListExists();
       const parts =
         this.editing.rule.regex && this.editing.rule.regex.length > 0
-          ? this.editing.rule.regex.split('|')
+          ? this.splitRegexIntoList(this.editing.rule.regex)
           : [];
       this.editing.rule.regex_list.splice(0, this.editing.rule.regex_list.length, ...parts);
       if (this.editing.rule.regex_list.length === 0) {
@@ -252,6 +252,27 @@ export default {
       if (this.editing.rule.regex_list.length === 0) {
         this.editing.rule.regex_list.push('');
       }
+    },
+    splitRegexIntoList(pattern: string): string[] {
+      const parts: string[] = [];
+      let current = '';
+      let escaping = false;
+      for (const ch of pattern) {
+        if (ch === '\\' && !escaping) {
+          escaping = true;
+          current += ch;
+          continue;
+        }
+        if (ch === '|' && !escaping) {
+          parts.push(current);
+          current = '';
+          continue;
+        }
+        escaping = false;
+        current += ch;
+      }
+      parts.push(current);
+      return parts;
     },
     getRegexFromList(): string {
       const list = this.editing.rule.regex_list || [];
