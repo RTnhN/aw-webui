@@ -56,21 +56,21 @@ export default {
     labels() {
       const start = this.timeperiod_start;
       const [count, resolution] = this.timeperiod_length;
-      
+
       // Handle custom hour ranges (including fractional hours like 1.5)
       if (resolution.startsWith('hour')) {
         // For custom hour ranges, show start time and end time
         const startDate = new Date(start);
         const startHour = startDate.getHours();
         const startMin = startDate.getMinutes();
-        
+
         // Calculate end time
         const endDate = new Date(startDate.getTime() + count * 60 * 60 * 1000);
         const endHour = endDate.getHours();
         const endMin = endDate.getMinutes();
-        
+
         const formatTime = (h, m) => `${h}:${m.toString().padStart(2, '0')}`;
-        
+
         // Return a single label showing the time range
         return [`${formatTime(startHour, startMin)} - ${formatTime(endHour, endMin)}`];
       } else if (resolution.startsWith('day') && count == 1) {
@@ -113,11 +113,11 @@ export default {
     chartOptions(): ChartOptions {
       const resolution = this.timeperiod_length[1];
       const count = this.timeperiod_length[0];
-      
+
       // For custom hour ranges, set appropriate y-axis max
       let max = undefined;
       let stepSize = 1;
-      
+
       if (resolution.startsWith('hour')) {
         // For hour ranges, max should be the duration
         max = count;
@@ -127,7 +127,7 @@ export default {
         max = 1;
         stepSize = 0.25;
       }
-      
+
       return {
         plugins: {
           tooltip: {

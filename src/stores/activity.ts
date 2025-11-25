@@ -445,7 +445,7 @@ export const useActivityStore = defineStore('activity', {
 
       // Handle hourly timeperiods
       if (res.startsWith('hour')) {
-        // For hour periods (including custom ranges like 1.5 hours), 
+        // For hour periods (including custom ranges like 1.5 hours),
         // just query the exact timeperiod as a single period
         periods = [timeperiodToStr(timeperiod)];
       } else if (res.startsWith('day') && count == 1) {
@@ -513,12 +513,12 @@ export const useActivityStore = defineStore('activity', {
           always_active_pattern,
           ...(isAndroid
             ? {
-              bid_android: this.buckets.android[0],
-            }
+                bid_android: this.buckets.android[0],
+              }
             : {
-              bid_afk: this.buckets.afk[0],
-              bid_window: this.buckets.window[0],
-            }),
+                bid_afk: this.buckets.afk[0],
+                bid_window: this.buckets.window[0],
+              }),
         });
         const result = await getClient().query([period], query, {
           verbose: true,
