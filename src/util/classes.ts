@@ -7,9 +7,23 @@ const CLASSIFY_KEYS = ['app', 'title'];
 const UNCATEGORIZED = ['Uncategorized'];
 
 export interface Rule {
-  type: 'regex' | 'none';
+  type: 'regex' | 'regex_list' | 'none' | null;
   regex?: string;
+  regex_list?: string[];
   ignore_case?: boolean;
+}
+
+export function ruleToRegex(rule: Rule): string | null {
+  if (!rule || rule.type === 'none' || rule.type === null) return null;
+  if (rule.type === 'regex') return rule.regex || '';
+
+  if (rule.type === 'regex_list') {
+    const parts = (rule.regex_list || []).filter(r => r !== '');
+    if (parts.length === 0) return null;
+    return parts.join('|');
+  }
+
+  return null;
 }
 
 export interface Category {
@@ -187,7 +201,14 @@ export function cleanCategory(cat: Category): Category {
   delete cat.depth;
   // in an older version, type could be null (which is not allowed)
   // we also want to strip any excess properties that may have belonged to another rule type
-  if (cat.rule && (cat.rule.type === null || cat.rule.type === 'none')) {
+  if (cat.rule && cat.rule.type === 'regex_list') {
+    const regex = ruleToRegex(cat.rule);
+    if (regex) {
+      cat.rule = { type: 'regex', regex, ignore_case: cat.rule.ignore_case };
+    } else {
+      cat.rule = { type: 'none' };
+    }
+  } else if (cat.rule && (cat.rule.type === null || cat.rule.type === 'none')) {
     cat.rule = { type: 'none' };
   }
   return cat;
@@ -212,12 +233,14 @@ export function matchString(str: string, categories: Category[] | null): Categor
 
   // Compile regexes
   const regexes: [Category, RegExp][] = categories
-    .filter(c => c.rule.type == 'regex')
     .map(c => {
+      const pattern = ruleToRegex(c.rule);
+      if (!pattern) return null;
       // using 'm' flag to make `$` and `^` in rules work
-      const re = RegExp(c.rule.regex, (c.rule.ignore_case ? 'i' : '') + 'm');
+      const re = RegExp(pattern, (c.rule && c.rule.ignore_case ? 'i' : '') + 'm');
       return [c, re];
-    });
+    })
+    .filter(Boolean) as [Category, RegExp][];
 
   // Find the matching category.
   // If several categories match the event, the deepest category will be chosen.
@@ -232,11 +255,13 @@ export function matchString(str: string, categories: Category[] | null): Categor
 export function classifyEvents(events: IEvent[], categories: Category[]): IEvent[] {
   // Compile regexes
   const regexes: [Category, RegExp][] = categories
-    .filter(c => c.rule.type == 'regex')
     .map(c => {
-      const re = RegExp(c.rule.regex, c.rule.ignore_case ? 'i' : '');
+      const pattern = ruleToRegex(c.rule);
+      if (!pattern) return null;
+      const re = RegExp(pattern, c.rule && c.rule.ignore_case ? 'i' : '');
       return [c, re];
-    });
+    })
+    .filter(Boolean) as [Category, RegExp][];
 
   // Classify events using compiled regexes.
   // If several categories match the event, the deepest category will be chosen.
