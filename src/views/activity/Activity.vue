@@ -229,10 +229,10 @@ export default {
         return this.$route.query.start_time || '00:00';
       },
       set(value) {
-        this.$router.push({ 
-          query: { ...this.$route.query, start_time: value } 
+        this.$router.push({
+          query: { ...this.$route.query, start_time: value },
         });
-      }
+      },
     },
 
     endTime: {
@@ -240,10 +240,10 @@ export default {
         return this.$route.query.end_time || '23:59';
       },
       set(value) {
-        this.$router.push({ 
-          query: { ...this.$route.query, end_time: value } 
+        this.$router.push({
+          query: { ...this.$route.query, end_time: value },
         });
-      }
+      },
     },
 
     // number of filters currently set (different from defaults)
@@ -325,24 +325,24 @@ export default {
           // Parse start and end times
           const [startHour, startMin] = this.startTime.split(':').map(Number);
           const [endHour, endMin] = this.endTime.split(':').map(Number);
-          
+
           // Create moment objects for start and end
           const startDateTime = moment(this._date)
             .startOf('day')
             .add(startHour, 'hours')
             .add(startMin, 'minutes');
-          
+
           const endDateTime = moment(this._date)
             .startOf('day')
             .add(endHour, 'hours')
             .add(endMin, 'minutes');
-          
+
           // Calculate duration in hours (can be fractional)
           const durationHours = endDateTime.diff(startDateTime, 'minutes') / 60;
-          
+
           return {
             start: startDateTime.format(),
-            length: [durationHours, 'hour'],  // Use 'hour' (singular) to match TimelineBarChart
+            length: [durationHours, 'hour'], // Use 'hour' (singular) to match TimelineBarChart
           };
         }
 
@@ -547,17 +547,17 @@ export default {
         name: '',
       };
     },
-    
-    setStartTime: function(time) {
+
+    setStartTime: function (time) {
       this.startTime = time;
     },
-    
-    setEndTime: function(time) {
+
+    setEndTime: function (time) {
       this.endTime = time;
     },
     toggleCategorizeMode() {
       this.categorizeMode = !this.categorizeMode;
-    }
+    },
   },
 };
 </script>
