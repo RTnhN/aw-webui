@@ -58,13 +58,26 @@ div
     | Events shown: {{ num_events }}
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
     | No events match selected criteria. Timeline is not updated.
-  
   div(style="float: right; color: #999").d-inline-block.pt-3
     | Drag to pan and scroll to zoom
 
+  div(style="clear: both")
+  div.mt-3.mb-2
+    b-button.mr-2(
+      size="sm",
+      :variant="toolMenuOpen ? 'primary' : 'outline-primary'",
+      @click="toggleToolMenu"
+    ) Tools
+    span.text-muted.small(v-if="activeTool") Active tool: {{ activeTool }}
+    div.d-inline-block.ml-2(v-if="toolMenuOpen")
+      b-button.mr-1(size="sm", :variant="activeTool === 'cut' ? 'primary' : 'outline-primary'" @click="selectTool('cut')" title="Split an event at the clicked time") Cut
+      b-button.mr-1(size="sm", :variant="activeTool === 'glue' ? 'primary' : 'outline-primary'" @click="selectTool('glue')" title="Merge two consecutive events into one") Glue
+      b-button.mr-1(size="sm", :variant="activeTool === 'grow' ? 'primary' : 'outline-primary'" @click="selectTool('grow')" title="Extend first event to start of second to fill a gap") Grow
+      b-button.mr-1(size="sm", :variant="activeTool === 'shrink' ? 'primary' : 'outline-primary'" @click="selectTool('shrink')" title="Trim first event to start of second to remove overlap") Shrink
+
   div(v-if="buckets !== null")
     div(style="clear: both")
-    vis-timeline(:buckets="buckets", :showRowLabels='true', :queriedInterval="daterange", :swimlane="swimlane", :updateTimelineWindow='updateTimelineWindow')
+    vis-timeline(:buckets="buckets", :showRowLabels='true', :queriedInterval="daterange", :swimlane="swimlane", :updateTimelineWindow='updateTimelineWindow', :tool="activeTool")
 
     aw-devonly(reason="Not ready for production, still experimenting")
       aw-calendar(:buckets="buckets")
@@ -106,6 +119,8 @@ export default {
       filter_duration: savedDuration as number | null,
       swimlane: null,
       updateTimelineWindow: true,
+      toolMenuOpen: false,
+      activeTool: null as string | null,
     };
   },
   computed: {
@@ -222,6 +237,12 @@ export default {
     },
     clearAllClients() {
       this.filter_clients = [];
+    },
+    toggleToolMenu() {
+      this.toolMenuOpen = !this.toolMenuOpen;
+    },
+    selectTool(tool: string) {
+      this.activeTool = this.activeTool === tool ? null : tool;
     },
     handleClickOutside(event: MouseEvent) {
       const details = this.$refs.filterDetails as HTMLElement | undefined;

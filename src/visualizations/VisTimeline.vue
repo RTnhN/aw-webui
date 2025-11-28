@@ -14,21 +14,21 @@ div#visualization {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
   overflow: visible;
+}
 
-  .vis-timeline {
-    overflow: visible;
+.vis-timeline {
+  overflow: visible;
+}
+
+.timeline-timeline {
+  font-family: sans-serif !important;
+
+  .timeline-panel {
+    box-sizing: border-box;
   }
 
-  .timeline-timeline {
-    font-family: sans-serif !important;
-
-    .timeline-panel {
-      box-sizing: border-box;
-    }
-
-    .timeline-item {
-      border-radius: 2px;
-    }
+  .timeline-item {
+    border-radius: 2px;
   }
 }
 </style>
@@ -70,6 +70,7 @@ export default {
     showQueriedInterval: { type: Boolean },
     swimlane: { type: String },
     updateTimelineWindow: { type: Boolean },
+    tool: { type: String, default: null },
   },
   data() {
     return {
@@ -83,13 +84,14 @@ export default {
         stack: false,
         tooltip: {
           followMouse: true,
-          overflowMethod: 'cap',
+          overflowMethod: 'flip',
           delay: 0,
         },
       },
       editingEvent: null,
       editingEventBucket: null,
 
+      pendingSelection: null,
       updateHasRun: false,
     };
   },
@@ -142,6 +144,11 @@ export default {
     },
   },
   watch: {
+    tool(newVal) {
+      if (!['glue', 'grow', 'shrink'].includes(newVal || '')) {
+        this.pendingSelection = null;
+      }
+    },
     buckets() {
       // For some reason, an object is passed here, after which the correct array arrives
       if (this.buckets.length === undefined) {
@@ -180,28 +187,297 @@ export default {
     onSelect: async function (properties) {
       if (properties.items.length == 0) {
         return;
-      } else if (properties.items.length == 1) {
-        const event = this.chartData[properties.items[0]].event;
-        const groupId = this.items[properties.items[0]].group;
-        const bucketId = _.find(this.groups, g => g.id == groupId).content;
-
-        // We retrieve the full event to ensure if's not cut-off by the query range
-        // See: https://github.com/ActivityWatch/aw-webui/pull/320#issuecomment-1056921587
-        this.editingEvent = await this.$aw.getEvent(bucketId, event.id);
-        this.editingEventBucket = bucketId;
-
-        this.$nextTick(() => {
-          console.log('Editing event', event, ', in bucket', bucketId);
-          this.openEditor();
-        });
-        if (!isAlertWarningShown) {
-          alert(
-            "Note: Changes won't be reflected in the timeline until the page is refreshed. This will be improved in a future version."
-          );
-          isAlertWarningShown = true;
-        }
-      } else {
+      } else if (properties.items.length !== 1) {
         alert('selected multiple items: ' + JSON.stringify(properties.items));
+        return;
+      }
+
+      const selection = this.getSelectionContext(properties.items[0]);
+      if (!selection) return;
+
+      const { event, bucketId } = selection;
+
+      if (this.tool === 'cut') {
+        await this.handleCut(selection, properties);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'glue') {
+        await this.handleGlue(selection);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'grow') {
+        await this.handleGrow(selection);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'shrink') {
+        await this.handleShrink(selection);
+        this.clearSelection();
+        return;
+      }
+
+      // We retrieve the full event to ensure if's not cut-off by the query range
+      // See: https://github.com/ActivityWatch/aw-webui/pull/320#issuecomment-1056921587
+      this.editingEvent = await this.$aw.getEvent(bucketId, event.id);
+      this.editingEventBucket = bucketId;
+
+      this.$nextTick(() => {
+        console.log('Editing event', event, ', in bucket', bucketId);
+        this.openEditor();
+      });
+      if (!isAlertWarningShown) {
+        alert(
+          "Note: Changes won't be reflected in the timeline until the page is refreshed. This will be improved in a future version."
+        );
+        isAlertWarningShown = true;
+      }
+      this.clearSelection();
+    },
+    clearSelection() {
+      if (this.timeline) {
+        this.timeline.setSelection([]);
+      }
+    },
+    getSelectionContext(itemIndex: number) {
+      const chartItem = this.chartData[itemIndex];
+      const item = this.items[itemIndex];
+      if (!chartItem || !item) return null;
+      return {
+        event: chartItem.event,
+        bucketId: item.group,
+        itemIndex,
+      };
+    },
+    getClickTime(properties) {
+      if (!this.timeline || !properties || !properties.event) return null;
+      try {
+        const eventProps = this.timeline.getEventProperties(properties.event);
+        if (eventProps && eventProps.time) {
+          return moment(eventProps.time);
+        }
+      } catch (err) {
+        console.warn('Unable to determine click time from timeline', err);
+      }
+      return null;
+    },
+    async handleCut(selection, properties) {
+      const { event, bucketId } = selection;
+      const fullEvent = await this.$aw.getEvent(bucketId, event.id);
+      const start = moment(fullEvent.timestamp);
+      const end = start.clone().add(fullEvent.duration, 'seconds');
+
+      const clickedTime = this.getClickTime(properties);
+      let cutMoment =
+        clickedTime && clickedTime.isBetween(start, end, undefined, '[]')
+          ? clickedTime
+          : start.clone().add(fullEvent.duration / 2, 'seconds');
+      if (cutMoment.isSameOrBefore(start)) cutMoment = start.clone().add(1, 'seconds');
+      if (cutMoment.isSameOrAfter(end)) cutMoment = end.clone().subtract(1, 'seconds');
+
+      if (!cutMoment.isBetween(start, end)) {
+        alert('Unable to determine cut position inside the event.');
+        return;
+      }
+
+      const firstDuration = cutMoment.diff(start, 'seconds', true);
+      const secondDuration = end.diff(cutMoment, 'seconds', true);
+      if (firstDuration <= 0 || secondDuration <= 0) {
+        alert('Cut time must be within the event duration.');
+        return;
+      }
+
+      const updatedEvent = _.cloneDeep(fullEvent);
+      updatedEvent.duration = firstDuration;
+
+      const { id, ...rest } = _.cloneDeep(fullEvent);
+      const newEvent = {
+        ...rest,
+        timestamp: cutMoment.toDate(),
+        duration: secondDuration,
+      };
+
+      try {
+        await this.$aw.replaceEvent(bucketId, updatedEvent);
+        await this.$aw.insertEvent(bucketId, newEvent);
+        await this.refreshBucketSegment(bucketId, start, end);
+      } catch (err) {
+        console.error('Failed to cut event', err);
+        alert('Failed to cut event. Please try again.');
+      }
+    },
+    async refreshBucketSegment(bucketId, start, end) {
+      const bucket = _.find(this.bucketsFromEither, b => b.id === bucketId);
+      if (!bucket || !bucket.events) {
+        this.update();
+        return;
+      }
+
+      try {
+        const freshEvents = await this.$aw.getEvents(bucketId, {
+          starttime: start.toISOString(),
+          endtime: end.toISOString(),
+        });
+        const outsideEvents = bucket.events.filter(evt => {
+          const evtStart = moment(evt.timestamp);
+          const evtEnd = evtStart.clone().add(evt.duration, 'seconds');
+          return evtEnd.isSameOrBefore(start) || evtStart.isSameOrAfter(end);
+        });
+
+        bucket.events = [...outsideEvents, ...freshEvents].sort((a, b) => {
+          return new Date(a.timestamp).valueOf() - new Date(b.timestamp).valueOf();
+        });
+      } catch (err) {
+        console.warn('Failed to refresh bucket after cut', err);
+      }
+
+      this.update();
+    },
+    async handleGlue(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const first = this.pendingSelection;
+      const second = selection;
+
+      if (first.bucketId !== second.bucketId) {
+        alert('Events must be in the same bucket to glue.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (first.event.id === second.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      // Ensure order: first should start before second
+      const firstEventFull = await this.$aw.getEvent(first.bucketId, first.event.id);
+      const secondEventFull = await this.$aw.getEvent(second.bucketId, second.event.id);
+      const firstStart = moment(firstEventFull.timestamp);
+      const firstEnd = firstStart.clone().add(firstEventFull.duration, 'seconds');
+      const secondStart = moment(secondEventFull.timestamp);
+      const secondEnd = secondStart.clone().add(secondEventFull.duration, 'seconds');
+
+      // Check consecutiveness (allow tiny overlap/gap tolerance)
+      const diffSeconds = secondStart.diff(firstEnd, 'seconds', true);
+      const tolerance = 0.5;
+      if (diffSeconds < -tolerance || diffSeconds > tolerance) {
+        alert('Events must be consecutive (no significant gap or overlap) to glue.');
+        this.pendingSelection = null;
+        return;
+      }
+
+      // Glue: extend first to end of second, delete second
+      const updatedFirst = _.cloneDeep(firstEventFull);
+      updatedFirst.duration = secondEnd.diff(firstStart, 'seconds', true);
+
+      try {
+        await this.$aw.replaceEvent(first.bucketId, updatedFirst);
+        await this.$aw.deleteEvent(second.bucketId, secondEventFull.id);
+        await this.refreshBucketSegment(first.bucketId, firstStart, secondEnd);
+      } catch (err) {
+        console.error('Failed to glue events', err);
+        alert('Failed to glue events. Please try again.');
+      } finally {
+        this.pendingSelection = null;
+      }
+    },
+    async handleGrow(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const first = this.pendingSelection;
+      const second = selection;
+
+      if (first.bucketId !== second.bucketId) {
+        alert('Events must be in the same bucket to grow.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (first.event.id === second.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      const firstEventFull = await this.$aw.getEvent(first.bucketId, first.event.id);
+      const secondEventFull = await this.$aw.getEvent(second.bucketId, second.event.id);
+      const firstStart = moment(firstEventFull.timestamp);
+      const firstEnd = firstStart.clone().add(firstEventFull.duration, 'seconds');
+      const secondStart = moment(secondEventFull.timestamp);
+
+      const diffSeconds = secondStart.diff(firstEnd, 'seconds', true);
+      if (diffSeconds < 0) {
+        alert('Second event must start after the first event to grow.');
+        this.pendingSelection = null;
+        return;
+      }
+
+      const updatedFirst = _.cloneDeep(firstEventFull);
+      updatedFirst.duration = secondStart.diff(firstStart, 'seconds', true);
+
+      try {
+        await this.$aw.replaceEvent(first.bucketId, updatedFirst);
+        await this.refreshBucketSegment(first.bucketId, firstStart, secondStart);
+      } catch (err) {
+        console.error('Failed to grow event', err);
+        alert('Failed to grow event. Please try again.');
+      } finally {
+        this.pendingSelection = null;
+      }
+    },
+    async handleShrink(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const first = this.pendingSelection;
+      const second = selection;
+
+      if (first.bucketId !== second.bucketId) {
+        alert('Events must be in the same bucket to shrink.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (first.event.id === second.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      const firstEventFull = await this.$aw.getEvent(first.bucketId, first.event.id);
+      const secondEventFull = await this.$aw.getEvent(second.bucketId, second.event.id);
+      const firstStart = moment(firstEventFull.timestamp);
+      const secondStart = moment(secondEventFull.timestamp);
+
+      if (secondStart.isBefore(firstStart)) {
+        alert('Second event must start after the first event to shrink.');
+        this.pendingSelection = null;
+        return;
+      }
+
+      const newDuration = secondStart.diff(firstStart, 'seconds', true);
+      if (newDuration <= 0) {
+        alert('Cannot shrink: resulting duration would be zero or negative.');
+        this.pendingSelection = null;
+        return;
+      }
+
+      const updatedFirst = _.cloneDeep(firstEventFull);
+      updatedFirst.duration = newDuration;
+
+      try {
+        await this.$aw.replaceEvent(first.bucketId, updatedFirst);
+        await this.refreshBucketSegment(first.bucketId, firstStart, secondStart);
+      } catch (err) {
+        console.error('Failed to shrink event', err);
+        alert('Failed to shrink event. Please try again.');
+      } finally {
+        this.pendingSelection = null;
       }
     },
     ensureUpdate() {
