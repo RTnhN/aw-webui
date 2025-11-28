@@ -84,7 +84,7 @@ export default {
         stack: false,
         tooltip: {
           followMouse: true,
-          overflowMethod: 'cap',
+          overflowMethod: 'flip',
           delay: 0,
         },
       },
