@@ -145,6 +145,14 @@ export default {
       return moment(this.start).add(this.maxDuration, 'seconds').isBefore(moment(this.end));
     },
   },
+  watch: {
+    start(newStart, oldStart) {
+      // If no end is set (or it's still mirroring the old start), keep end in sync for quick single-day selection
+      if (!this.end || this.end === oldStart) {
+        this.end = newStart;
+      }
+    },
+  },
   mounted() {
     this.duration = this.defaultDuration;
     this.valueChanged();
