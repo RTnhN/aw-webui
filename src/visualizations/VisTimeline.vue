@@ -58,6 +58,38 @@ interface IChartDataItem {
   event: IEvent;
   swimlane: string;
 }
+
+type EventWithId = IEvent & { id?: number };
+
+type UndoEntry =
+  | {
+      type: 'cut';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      originalEvent: EventWithId;
+      newEventSignature: {
+        timestamp: Date;
+        duration: number;
+        data: Record<string, unknown>;
+        id?: number;
+      };
+    }
+  | {
+      type: 'glue';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      firstOriginal: EventWithId;
+      secondOriginal: EventWithId;
+    }
+  | {
+      type: 'grow' | 'shrink';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      originalEvent: EventWithId;
+    };
 export default {
   components: {
     EventEditor,
@@ -93,6 +125,9 @@ export default {
 
       pendingSelection: null,
       updateHasRun: false,
+
+      undoStack: [] as UndoEntry[],
+      undoLimit: 20,
     };
   },
   computed: {
@@ -178,6 +213,7 @@ export default {
       });
 
       this.ensureUpdate();
+      this.emitUndoAvailability();
     });
   },
   methods: {
@@ -302,6 +338,26 @@ export default {
         await this.$aw.replaceEvent(bucketId, updatedEvent);
         await this.$aw.insertEvent(bucketId, newEvent);
         await this.refreshBucketSegment(bucketId, start, end);
+
+        const createdEvent = this.findEventMatch(
+          bucketId,
+          newEvent.timestamp,
+          newEvent.duration,
+          newEvent.data
+        );
+        this.pushUndoEntry({
+          type: 'cut',
+          bucketId,
+          rangeStart: start.toISOString(),
+          rangeEnd: end.toISOString(),
+          originalEvent: _.cloneDeep(fullEvent),
+          newEventSignature: {
+            timestamp: newEvent.timestamp,
+            duration: newEvent.duration,
+            data: _.cloneDeep(newEvent.data),
+            id: createdEvent ? createdEvent.id : undefined,
+          },
+        });
       } catch (err) {
         console.error('Failed to cut event', err);
         alert('Failed to cut event. Please try again.');
@@ -378,6 +434,15 @@ export default {
         await this.$aw.replaceEvent(first.bucketId, updatedFirst);
         await this.$aw.deleteEvent(second.bucketId, secondEventFull.id);
         await this.refreshBucketSegment(first.bucketId, firstStart, secondEnd);
+
+        this.pushUndoEntry({
+          type: 'glue',
+          bucketId: first.bucketId,
+          rangeStart: firstStart.toISOString(),
+          rangeEnd: secondEnd.toISOString(),
+          firstOriginal: _.cloneDeep(firstEventFull),
+          secondOriginal: _.cloneDeep(secondEventFull),
+        });
       } catch (err) {
         console.error('Failed to glue events', err);
         alert('Failed to glue events. Please try again.');
@@ -423,6 +488,14 @@ export default {
       try {
         await this.$aw.replaceEvent(first.bucketId, updatedFirst);
         await this.refreshBucketSegment(first.bucketId, firstStart, secondStart);
+
+        this.pushUndoEntry({
+          type: 'grow',
+          bucketId: first.bucketId,
+          rangeStart: firstStart.toISOString(),
+          rangeEnd: moment.max(firstEnd, secondStart).toISOString(),
+          originalEvent: _.cloneDeep(firstEventFull),
+        });
       } catch (err) {
         console.error('Failed to grow event', err);
         alert('Failed to grow event. Please try again.');
@@ -473,12 +546,129 @@ export default {
       try {
         await this.$aw.replaceEvent(first.bucketId, updatedFirst);
         await this.refreshBucketSegment(first.bucketId, firstStart, secondStart);
+
+        this.pushUndoEntry({
+          type: 'shrink',
+          bucketId: first.bucketId,
+          rangeStart: firstStart.toISOString(),
+          rangeEnd: moment
+            .max(firstStart.clone().add(newDuration, 'seconds'), secondStart)
+            .toISOString(),
+          originalEvent: _.cloneDeep(firstEventFull),
+        });
       } catch (err) {
         console.error('Failed to shrink event', err);
         alert('Failed to shrink event. Please try again.');
       } finally {
         this.pendingSelection = null;
       }
+    },
+    getBucketEvents(bucketId: string) {
+      const bucket = _.find(this.bucketsFromEither, b => b.id === bucketId);
+      return bucket && bucket.events ? bucket.events : [];
+    },
+    findEventMatch(bucketId: string, timestamp: Date, duration: number, data: any) {
+      const targetTs = moment(timestamp).valueOf();
+      const toleranceMs = 500;
+      const durationTolerance = 0.001;
+      const events = this.getBucketEvents(bucketId);
+      return _.find(events, e => {
+        const ts = moment(e.timestamp).valueOf();
+        const closeInTime = Math.abs(ts - targetTs) <= toleranceMs;
+        const closeInDuration = Math.abs(e.duration - duration) <= durationTolerance;
+        return closeInTime && closeInDuration && _.isEqual(e.data, data);
+      });
+    },
+    pushUndoEntry(entry: UndoEntry) {
+      this.undoStack.push(entry);
+      if (this.undoStack.length > this.undoLimit) {
+        this.undoStack.shift();
+      }
+      this.emitUndoAvailability();
+    },
+    emitUndoAvailability() {
+      this.$emit('undo-available', this.undoStack.length > 0);
+    },
+    async triggerUndo() {
+      if (!this.undoStack.length) return;
+
+      const entry = this.undoStack.pop();
+      try {
+        await this.applyUndo(entry);
+      } catch (err) {
+        console.error('Failed to undo last action', err);
+        alert('Failed to undo last change. Please try again.');
+        this.undoStack.push(entry);
+      } finally {
+        this.emitUndoAvailability();
+      }
+    },
+    async applyUndo(entry?: UndoEntry) {
+      if (!entry) return;
+      if (entry.type === 'cut') {
+        await this.undoCut(entry);
+      } else if (entry.type === 'glue') {
+        await this.undoGlue(entry);
+      } else if (entry.type === 'grow' || entry.type === 'shrink') {
+        await this.undoResize(entry);
+      }
+    },
+    async undoCut(entry: Extract<UndoEntry, { type: 'cut' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.originalEvent);
+        if (entry.newEventSignature && entry.newEventSignature.id !== undefined) {
+          await this.$aw.deleteEvent(entry.bucketId, entry.newEventSignature.id);
+        } else if (entry.newEventSignature) {
+          const matching = this.findEventMatch(
+            entry.bucketId,
+            entry.newEventSignature.timestamp,
+            entry.newEventSignature.duration,
+            entry.newEventSignature.data
+          );
+          if (matching && matching.id !== undefined) {
+            await this.$aw.deleteEvent(entry.bucketId, matching.id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to undo cut', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
+    },
+    async undoGlue(entry: Extract<UndoEntry, { type: 'glue' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.firstOriginal);
+        const { id, ...secondNoId } = entry.secondOriginal as EventWithId;
+        await this.$aw.insertEvent(entry.bucketId, secondNoId as IEvent);
+      } catch (err) {
+        console.error('Failed to undo glue', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
+    },
+    async undoResize(entry: Extract<UndoEntry, { type: 'grow' | 'shrink' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.originalEvent);
+      } catch (err) {
+        console.error('Failed to undo resize', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
     },
     ensureUpdate() {
       // Will only run update() if data available and never ran before
