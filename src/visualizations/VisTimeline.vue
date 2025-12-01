@@ -339,7 +339,12 @@ export default {
         await this.$aw.insertEvent(bucketId, newEvent);
         await this.refreshBucketSegment(bucketId, start, end);
 
-        const createdEvent = this.findEventMatch(bucketId, newEvent.timestamp, newEvent.duration, newEvent.data);
+        const createdEvent = this.findEventMatch(
+          bucketId,
+          newEvent.timestamp,
+          newEvent.duration,
+          newEvent.data
+        );
         this.pushUndoEntry({
           type: 'cut',
           bucketId,
@@ -546,7 +551,9 @@ export default {
           type: 'shrink',
           bucketId: first.bucketId,
           rangeStart: firstStart.toISOString(),
-          rangeEnd: moment.max(firstStart.clone().add(newDuration, 'seconds'), secondStart).toISOString(),
+          rangeEnd: moment
+            .max(firstStart.clone().add(newDuration, 'seconds'), secondStart)
+            .toISOString(),
           originalEvent: _.cloneDeep(firstEventFull),
         });
       } catch (err) {
