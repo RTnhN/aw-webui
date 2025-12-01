@@ -68,6 +68,13 @@ div
       :variant="toolMenuOpen ? 'primary' : 'outline-primary'",
       @click="toggleToolMenu"
     ) Tools
+    b-button.mr-2(
+      size="sm",
+      :variant="undoAvailable ? 'primary' : 'outline-secondary'",
+      :disabled="!undoAvailable",
+      @click="undoLastChange",
+      title="Undo last timeline tool action"
+    ) Undo
     span.text-muted.small(v-if="activeTool") Active tool: {{ activeTool }}
     div.d-inline-block.ml-2(v-if="toolMenuOpen")
       b-button.mr-1(size="sm", :variant="activeTool === 'cut' ? 'primary' : 'outline-primary'" @click="selectTool('cut')" title="Split an event at the clicked time") Cut
@@ -77,7 +84,16 @@ div
 
   div(v-if="buckets !== null")
     div(style="clear: both")
-    vis-timeline(:buckets="buckets", :showRowLabels='true', :queriedInterval="daterange", :swimlane="swimlane", :updateTimelineWindow='updateTimelineWindow', :tool="activeTool")
+    vis-timeline(
+      ref="visTimeline"
+      :buckets="buckets"
+      :showRowLabels='true'
+      :queriedInterval="daterange"
+      :swimlane="swimlane"
+      :updateTimelineWindow='updateTimelineWindow'
+      :tool="activeTool"
+      @undo-available="onUndoAvailable"
+    )
 
     aw-devonly(reason="Not ready for production, still experimenting")
       aw-calendar(:buckets="buckets")
@@ -121,6 +137,7 @@ export default {
       updateTimelineWindow: true,
       toolMenuOpen: false,
       activeTool: null as string | null,
+      undoAvailable: false,
     };
   },
   computed: {
@@ -243,6 +260,15 @@ export default {
     },
     selectTool(tool: string) {
       this.activeTool = this.activeTool === tool ? null : tool;
+    },
+    onUndoAvailable(status: boolean) {
+      this.undoAvailable = status;
+    },
+    async undoLastChange() {
+      const visTimeline = this.$refs.visTimeline as any;
+      if (visTimeline && typeof visTimeline.triggerUndo === 'function') {
+        await visTimeline.triggerUndo();
+      }
     },
     handleClickOutside(event: MouseEvent) {
       const details = this.$refs.filterDetails as HTMLElement | undefined;
