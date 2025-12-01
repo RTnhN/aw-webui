@@ -13,6 +13,7 @@ b-modal(id="edit" ref="edit" title="Edit category" @show="resetModal" @hidden="h
     b Rule
     b-input-group.my-1(prepend="Type")
       b-select(v-model="editing.rule.type", :options="allRuleTypes")
+    div.text-danger.small(v-if="regexListWarning") {{ regexListWarning }}
     div(v-if="editing.rule.type === 'regex'")
       b-input-group.my-1(prepend="Pattern")
         b-form-input(v-model="editing.rule.regex")
@@ -92,6 +93,8 @@ export default {
         inherit_score: true,
         score: null,
       },
+      regexListWarning: '',
+      skipListToRegexSync: false,
     };
   },
   computed: {
@@ -141,7 +144,15 @@ export default {
       if (new_value === 'regex_list') {
         this.ensureRegexListFromRegex();
       } else if (old_value === 'regex_list' && new_value === 'regex') {
-        this.editing.rule.regex = this.getRegexFromList();
+        if (this.skipListToRegexSync) {
+          this.skipListToRegexSync = false;
+          return;
+        } else {
+          this.editing.rule.regex = this.getRegexFromList();
+        }
+        this.regexListWarning = '';
+      } else {
+        this.regexListWarning = '';
       }
     },
   },
@@ -213,7 +224,7 @@ export default {
       const score = cat.data ? cat.data.score : undefined;
       const inherit_score = !score;
       const rule = _.cloneDeep(cat.rule);
-      if (rule.type === 'regex') {
+      if (rule.type === 'regex' && this.canUseRegexList(rule.regex || '')) {
         rule.regex_list = rule.regex ? this.splitRegexIntoList(rule.regex) : [];
       }
       this.editing = {
@@ -226,13 +237,20 @@ export default {
         score,
         inherit_score,
       };
+      this.regexListWarning = '';
+      this.skipListToRegexSync = false;
     },
     ensureRegexListFromRegex() {
+      const pattern = this.editing.rule.regex || '';
+      if (!this.canUseRegexList(pattern)) {
+        this.regexListWarning = 'Regex lists only support top-level "|" alternatives.';
+        this.skipListToRegexSync = true;
+        this.editing.rule.type = 'regex';
+        return;
+      }
+      this.regexListWarning = '';
       this.ensureRegexListExists();
-      const parts =
-        this.editing.rule.regex && this.editing.rule.regex.length > 0
-          ? this.splitRegexIntoList(this.editing.rule.regex)
-          : [];
+      const parts = pattern.length > 0 ? this.splitRegexIntoList(pattern) : [];
       this.editing.rule.regex_list.splice(0, this.editing.rule.regex_list.length, ...parts);
       if (this.editing.rule.regex_list.length === 0) {
         this.editing.rule.regex_list.push('');
@@ -253,11 +271,49 @@ export default {
         this.editing.rule.regex_list.push('');
       }
     },
+    canUseRegexList(pattern: string): boolean {
+      // Only allow list mode when all '|' are top-level (outside groups and char classes)
+      let escaping = false;
+      let inCharClass = false;
+      let parenDepth = 0;
+      for (const ch of pattern) {
+        if (escaping) {
+          escaping = false;
+          continue;
+        }
+        if (ch === '\\') {
+          escaping = true;
+          continue;
+        }
+        if (ch === '[' && !inCharClass) {
+          inCharClass = true;
+          continue;
+        }
+        if (ch === ']' && inCharClass) {
+          inCharClass = false;
+          continue;
+        }
+        if (inCharClass) continue;
+        if (ch === '(') {
+          parenDepth += 1;
+          continue;
+        }
+        if (ch === ')' && parenDepth > 0) {
+          parenDepth -= 1;
+          continue;
+        }
+        if (ch === '|' && parenDepth > 0) {
+          return false;
+        }
+      }
+      return true;
+    },
     splitRegexIntoList(pattern: string): string[] {
       const parts: string[] = [];
       let current = '';
       let escaping = false;
       let inCharClass = false;
+      let parenDepth = 0;
       for (const ch of pattern) {
         if (escaping) {
           current += ch;
@@ -269,11 +325,18 @@ export default {
           current += ch;
           continue;
         }
-        if (ch === '[') {
+        if (ch === '[' && !inCharClass) {
           inCharClass = true;
         } else if (ch === ']' && inCharClass) {
           inCharClass = false;
-        } else if (ch === '|' && !inCharClass) {
+        } else if (inCharClass) {
+          current += ch;
+          continue;
+        } else if (ch === '(') {
+          parenDepth += 1;
+        } else if (ch === ')' && parenDepth > 0) {
+          parenDepth -= 1;
+        } else if (ch === '|' && parenDepth === 0) {
           parts.push(current);
           current = '';
           continue;
