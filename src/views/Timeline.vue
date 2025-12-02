@@ -81,6 +81,7 @@ div
       b-button.mr-1(size="sm", :variant="activeTool === 'glue' ? 'primary' : 'outline-primary'" @click="selectTool('glue')" title="Merge two consecutive events into one") Glue
       b-button.mr-1(size="sm", :variant="activeTool === 'grow' ? 'primary' : 'outline-primary'" @click="selectTool('grow')" title="Extend first event to start of second to fill a gap") Grow
       b-button.mr-1(size="sm", :variant="activeTool === 'shrink' ? 'primary' : 'outline-primary'" @click="selectTool('shrink')" title="Trim first event to start of second to remove overlap") Shrink
+      b-button.mr-1(size="sm", :variant="activeTool === 'clone' ? 'primary' : 'outline-primary'" @click="selectTool('clone')" title="Copy data/title from one event onto another") Clone
 
   div(v-if="buckets !== null")
     div(style="clear: both")

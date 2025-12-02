@@ -89,6 +89,13 @@ type UndoEntry =
       rangeStart: string;
       rangeEnd: string;
       originalEvent: EventWithId;
+    }
+  | {
+      type: 'clone';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      originalEvent: EventWithId;
     };
 export default {
   components: {
@@ -180,7 +187,7 @@ export default {
   },
   watch: {
     tool(newVal) {
-      if (!['glue', 'grow', 'shrink'].includes(newVal || '')) {
+      if (!['glue', 'grow', 'shrink', 'clone'].includes(newVal || '')) {
         this.pendingSelection = null;
       }
     },
@@ -240,6 +247,11 @@ export default {
       }
       if (this.tool === 'glue') {
         await this.handleGlue(selection);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'clone') {
+        await this.handleClone(selection);
         this.clearSelection();
         return;
       }
@@ -421,7 +433,7 @@ export default {
       const diffSeconds = secondStart.diff(firstEnd, 'seconds', true);
       const tolerance = 0.5;
       if (diffSeconds < -tolerance || diffSeconds > tolerance) {
-        alert('Events must be consecutive (no significant gap or overlap) to glue.');
+        alert('Events must be consecutive (no significant gap or overlap) to glue. You might need to use the "grow" tool before "glue".');
         this.pendingSelection = null;
         return;
       }
@@ -446,6 +458,50 @@ export default {
       } catch (err) {
         console.error('Failed to glue events', err);
         alert('Failed to glue events. Please try again.');
+      } finally {
+        this.pendingSelection = null;
+      }
+    },
+    async handleClone(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const source = this.pendingSelection;
+      const target = selection;
+
+      if (source.bucketId !== target.bucketId) {
+        alert('Events must be in the same bucket to clone.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (source.event.id === target.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      const sourceEventFull = await this.$aw.getEvent(source.bucketId, source.event.id);
+      const targetEventFull = await this.$aw.getEvent(target.bucketId, target.event.id);
+      const updatedTarget = _.cloneDeep(targetEventFull);
+      updatedTarget.data = _.cloneDeep(sourceEventFull.data || {});
+
+      try {
+        await this.$aw.replaceEvent(target.bucketId, updatedTarget);
+        const targetStart = moment(targetEventFull.timestamp);
+        const targetEnd = targetStart.clone().add(targetEventFull.duration, 'seconds');
+        await this.refreshBucketSegment(target.bucketId, targetStart, targetEnd);
+
+        this.pushUndoEntry({
+          type: 'clone',
+          bucketId: target.bucketId,
+          rangeStart: targetStart.toISOString(),
+          rangeEnd: targetEnd.toISOString(),
+          originalEvent: _.cloneDeep(targetEventFull),
+        });
+      } catch (err) {
+        console.error('Failed to clone event data', err);
+        alert('Failed to clone event data. Please try again.');
       } finally {
         this.pendingSelection = null;
       }
@@ -611,6 +667,8 @@ export default {
         await this.undoGlue(entry);
       } else if (entry.type === 'grow' || entry.type === 'shrink') {
         await this.undoResize(entry);
+      } else if (entry.type === 'clone') {
+        await this.undoClone(entry);
       }
     },
     async undoCut(entry: Extract<UndoEntry, { type: 'cut' }>) {
@@ -631,6 +689,20 @@ export default {
         }
       } catch (err) {
         console.error('Failed to undo cut', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
+    },
+    async undoClone(entry: Extract<UndoEntry, { type: 'clone' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.originalEvent);
+      } catch (err) {
+        console.error('Failed to undo clone', err);
         throw err;
       }
 
