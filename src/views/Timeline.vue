@@ -68,15 +68,15 @@ div
       :variant="toolMenuOpen ? 'primary' : 'outline-primary'",
       @click="toggleToolMenu"
     ) Tools
-    b-button.mr-2(
-      size="sm",
-      :variant="undoAvailable ? 'primary' : 'outline-secondary'",
-      :disabled="!undoAvailable",
-      @click="undoLastChange",
-      title="Undo last timeline tool action"
-    ) Undo
     span.text-muted.small(v-if="activeTool") Active tool: {{ activeTool }}
     div.d-inline-block.ml-2(v-if="toolMenuOpen")
+      b-button.mr-2(
+        size="sm",
+        :variant="undoAvailable ? 'primary' : 'outline-secondary'",
+        :disabled="!undoAvailable",
+        @click="undoLastChange",
+        title="Undo last timeline tool action"
+      ) Undo
       b-button.mr-1(size="sm", :variant="activeTool === 'cut' ? 'primary' : 'outline-primary'" @click="selectTool('cut')" title="Split an event at the clicked time") Cut
       b-button.mr-1(size="sm", :variant="activeTool === 'glue' ? 'primary' : 'outline-primary'" @click="selectTool('glue')" title="Merge two consecutive events into one") Glue
       b-button.mr-1(size="sm", :variant="activeTool === 'grow' ? 'primary' : 'outline-primary'" @click="selectTool('grow')" title="Extend first event to start of second to fill a gap") Grow
