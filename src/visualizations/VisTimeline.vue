@@ -446,7 +446,9 @@ export default {
       const diffSeconds = secondStart.diff(firstEnd, 'seconds', true);
       const tolerance = 0.5;
       if (diffSeconds < -tolerance || diffSeconds > tolerance) {
-        alert('Events must be consecutive (no significant gap or overlap) to glue. You might need to use the "grow" tool before "glue".');
+        alert(
+          'Events must be consecutive (no significant gap or overlap) to glue. You might need to use the "grow" tool before "glue".'
+        );
         this.pendingSelection = null;
         return;
       }
