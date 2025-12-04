@@ -89,6 +89,21 @@ type UndoEntry =
       rangeStart: string;
       rangeEnd: string;
       originalEvent: EventWithId;
+    }
+  | {
+      type: 'clone';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      originalEvent: EventWithId;
+    }
+  | {
+      type: 'swap';
+      bucketId: string;
+      rangeStart: string;
+      rangeEnd: string;
+      firstOriginal: EventWithId;
+      secondOriginal: EventWithId;
     };
 export default {
   components: {
@@ -180,7 +195,7 @@ export default {
   },
   watch: {
     tool(newVal) {
-      if (!['glue', 'grow', 'shrink'].includes(newVal || '')) {
+      if (!['glue', 'grow', 'shrink', 'clone', 'swap'].includes(newVal || '')) {
         this.pendingSelection = null;
       }
     },
@@ -240,6 +255,16 @@ export default {
       }
       if (this.tool === 'glue') {
         await this.handleGlue(selection);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'clone') {
+        await this.handleClone(selection);
+        this.clearSelection();
+        return;
+      }
+      if (this.tool === 'swap') {
+        await this.handleSwap(selection);
         this.clearSelection();
         return;
       }
@@ -421,7 +446,9 @@ export default {
       const diffSeconds = secondStart.diff(firstEnd, 'seconds', true);
       const tolerance = 0.5;
       if (diffSeconds < -tolerance || diffSeconds > tolerance) {
-        alert('Events must be consecutive (no significant gap or overlap) to glue.');
+        alert(
+          'Events must be consecutive (no significant gap or overlap) to glue. You might need to use the "grow" tool before "glue".'
+        );
         this.pendingSelection = null;
         return;
       }
@@ -446,6 +473,114 @@ export default {
       } catch (err) {
         console.error('Failed to glue events', err);
         alert('Failed to glue events. Please try again.');
+      } finally {
+        this.pendingSelection = null;
+      }
+    },
+    async handleClone(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const source = this.pendingSelection;
+      const target = selection;
+
+      if (source.bucketId !== target.bucketId) {
+        alert('Events must be in the same bucket to clone.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (source.event.id === target.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      const sourceEventFull = await this.$aw.getEvent(source.bucketId, source.event.id);
+      const targetEventFull = await this.$aw.getEvent(target.bucketId, target.event.id);
+      const updatedTarget = _.cloneDeep(targetEventFull);
+      updatedTarget.data = _.cloneDeep(sourceEventFull.data || {});
+
+      try {
+        await this.$aw.replaceEvent(target.bucketId, updatedTarget);
+        const targetStart = moment(targetEventFull.timestamp);
+        const targetEnd = targetStart.clone().add(targetEventFull.duration, 'seconds');
+        await this.refreshBucketSegment(target.bucketId, targetStart, targetEnd);
+
+        this.pushUndoEntry({
+          type: 'clone',
+          bucketId: target.bucketId,
+          rangeStart: targetStart.toISOString(),
+          rangeEnd: targetEnd.toISOString(),
+          originalEvent: _.cloneDeep(targetEventFull),
+        });
+      } catch (err) {
+        console.error('Failed to clone event data', err);
+        alert('Failed to clone event data. Please try again.');
+      } finally {
+        this.pendingSelection = null;
+      }
+    },
+    async handleSwap(selection) {
+      if (!this.pendingSelection) {
+        this.pendingSelection = selection;
+        return;
+      }
+
+      const first = this.pendingSelection;
+      const second = selection;
+
+      if (first.bucketId !== second.bucketId) {
+        alert('Events must be in the same bucket to swap.');
+        this.pendingSelection = null;
+        return;
+      }
+      if (first.event.id === second.event.id) {
+        this.pendingSelection = null;
+        return;
+      }
+
+      const firstEventFull = await this.$aw.getEvent(first.bucketId, first.event.id);
+      const secondEventFull = await this.$aw.getEvent(second.bucketId, second.event.id);
+      const firstStart = moment(firstEventFull.timestamp);
+      const firstEnd = firstStart.clone().add(firstEventFull.duration, 'seconds');
+      const secondStart = moment(secondEventFull.timestamp);
+      const secondEnd = secondStart.clone().add(secondEventFull.duration, 'seconds');
+
+      const rangeStart = moment.min(firstStart, secondStart);
+      const rangeEnd = moment.max(firstEnd, secondEnd);
+
+      const updatedFirst = _.cloneDeep(firstEventFull);
+      // Swap only the data (which includes title) so the labels move between tiles without the
+      // visual positions cancelling out. Timestamps and durations stay with their original events.
+      updatedFirst.data = _.cloneDeep(secondEventFull.data);
+
+      const updatedSecond = _.cloneDeep(secondEventFull);
+      updatedSecond.data = _.cloneDeep(firstEventFull.data);
+
+      try {
+        await this.$aw.replaceEvent(first.bucketId, updatedFirst);
+        await this.$aw.replaceEvent(second.bucketId, updatedSecond);
+        await this.refreshBucketSegment(first.bucketId, rangeStart, rangeEnd);
+
+        this.pushUndoEntry({
+          type: 'swap',
+          bucketId: first.bucketId,
+          rangeStart: rangeStart.toISOString(),
+          rangeEnd: rangeEnd.toISOString(),
+          firstOriginal: _.cloneDeep(firstEventFull),
+          secondOriginal: _.cloneDeep(secondEventFull),
+        });
+      } catch (err) {
+        console.error('Failed to swap events', err);
+        alert('Failed to swap events. Please try again.');
+        try {
+          await this.$aw.replaceEvent(first.bucketId, firstEventFull);
+          await this.$aw.replaceEvent(second.bucketId, secondEventFull);
+          await this.refreshBucketSegment(first.bucketId, rangeStart, rangeEnd);
+        } catch (rollbackErr) {
+          console.warn('Failed to rollback swap attempt', rollbackErr);
+        }
       } finally {
         this.pendingSelection = null;
       }
@@ -611,6 +746,10 @@ export default {
         await this.undoGlue(entry);
       } else if (entry.type === 'grow' || entry.type === 'shrink') {
         await this.undoResize(entry);
+      } else if (entry.type === 'clone') {
+        await this.undoClone(entry);
+      } else if (entry.type === 'swap') {
+        await this.undoSwap(entry);
       }
     },
     async undoCut(entry: Extract<UndoEntry, { type: 'cut' }>) {
@@ -631,6 +770,20 @@ export default {
         }
       } catch (err) {
         console.error('Failed to undo cut', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
+    },
+    async undoClone(entry: Extract<UndoEntry, { type: 'clone' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.originalEvent);
+      } catch (err) {
+        console.error('Failed to undo clone', err);
         throw err;
       }
 
@@ -661,6 +814,21 @@ export default {
         await this.$aw.replaceEvent(entry.bucketId, entry.originalEvent);
       } catch (err) {
         console.error('Failed to undo resize', err);
+        throw err;
+      }
+
+      await this.refreshBucketSegment(
+        entry.bucketId,
+        moment(entry.rangeStart),
+        moment(entry.rangeEnd)
+      );
+    },
+    async undoSwap(entry: Extract<UndoEntry, { type: 'swap' }>) {
+      try {
+        await this.$aw.replaceEvent(entry.bucketId, entry.firstOriginal);
+        await this.$aw.replaceEvent(entry.bucketId, entry.secondOriginal);
+      } catch (err) {
+        console.error('Failed to undo swap', err);
         throw err;
       }
 
