@@ -570,8 +570,16 @@ export const useActivityStore = defineStore('activity', {
     async get_buckets(this: State, { host }) {
       // TODO: Move to bucketStore on a per-host basis?
       const bucketsStore = useBucketsStore();
-      this.buckets.afk = bucketsStore.bucketsAFK(host);
-      this.buckets.window = bucketsStore.bucketsWindow(host);
+      const hostHasWindow =
+        bucketsStore.bucketsAFK(host).length > 0 && bucketsStore.bucketsWindow(host).length > 0;
+      const fallbackHostWithWindow = bucketsStore.hosts.find(
+        h => bucketsStore.bucketsAFK(h).length > 0 && bucketsStore.bucketsWindow(h).length > 0
+      );
+      const hostForWindow = hostHasWindow ? host : fallbackHostWithWindow || host;
+
+      this.buckets.afk = bucketsStore.bucketsAFK(hostForWindow);
+      this.buckets.window = bucketsStore.bucketsWindow(hostForWindow);
+
       this.buckets.android = bucketsStore.bucketsAndroid(host);
       this.buckets.browser = bucketsStore.bucketsBrowser(host);
       this.buckets.editor = bucketsStore.bucketsEditor(host);
