@@ -181,7 +181,15 @@ export const useCategoryStore = defineStore('categories', {
       this.classes_unsaved_changes = true;
     },
     removeClass(this: State, classId: number) {
-      this.classes = this.classes.filter((c: Category) => c.id !== classId);
+      const target = this.classes.find((c: Category) => c.id === classId);
+      if (!target) {
+        console.warn(`Couldn't find category with id ${classId} to remove.`);
+        return;
+      }
+
+      this.classes = this.classes.filter(
+        (c: Category) => !_.isEqual(c.name.slice(0, target.name.length), target.name)
+      );
       this.classes_unsaved_changes = true;
     },
     appendClassRule(this: State, classId: number, pattern: string) {
