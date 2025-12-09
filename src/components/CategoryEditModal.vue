@@ -139,7 +139,10 @@ export default {
 
       const candidates = this.categoryStore.classes
         .filter(c => _.isEqual(c.name.slice(0, category.name.length), category.name))
-        .sort((a, b) => a.name.length - b.name.length || a.name.join('>').localeCompare(b.name.join('>')));
+        .sort(
+          (a, b) =>
+            a.name.length - b.name.length || a.name.join('>').localeCompare(b.name.join('>'))
+        );
 
       return candidates.map(c => {
         const depth = c.name.length - category.name.length;
