@@ -57,7 +57,7 @@ b-modal(id="edit" ref="edit" title="Edit category" @show="resetModal" @hidden="h
 
   hr
   div.my-1
-    b-btn(variant="danger", @click="removeClass(categoryId); $refs.edit.hide()")
+    b-btn(variant="danger", @click="handleRemove")
       icon(name="trash")
       | Remove category
 </template>
@@ -133,6 +133,26 @@ export default {
       }
       return this.editing.rule.regex || '';
     },
+    removalCandidates() {
+      const category = this.categoryStore.get_category_by_id(this.categoryId);
+      if (!category) return [];
+
+      const candidates = this.categoryStore.classes
+        .filter(c => _.isEqual(c.name.slice(0, category.name.length), category.name))
+        .sort(
+          (a, b) =>
+            a.name.length - b.name.length || a.name.join('>').localeCompare(b.name.join('>'))
+        );
+
+      return candidates.map(c => {
+        const depth = c.name.length - category.name.length;
+        return {
+          key: c.id ?? c.name.join('>'),
+          depth,
+          text: c.name.join(' > '),
+        };
+      });
+    },
   },
   watch: {
     categoryId: function (new_value) {
@@ -168,10 +188,32 @@ export default {
     hidden() {
       this.$emit('hidden');
     },
-    removeClass() {
-      // TODO: Show a confirmation dialog
-      // TODO: Remove children as well?
+    handleRemove() {
+      const category = this.categoryStore.get_category_by_id(this.categoryId);
+      if (!category) {
+        console.error('Could not find category to remove:', this.categoryId);
+        return;
+      }
+
+      const descendants = this.removalCandidates;
+      // Subtract the category itself
+      const childCount = Math.max(descendants.length - 1, 0);
+
+      if (
+        childCount > 0 &&
+        !confirm(
+          `This category has ${childCount} subcategor${
+            childCount === 1 ? 'y' : 'ies'
+          }. Deleting it will also delete the children:\n\n${descendants
+            .map(d => '- '.padStart(2 + d.depth * 2, ' ') + d.text)
+            .join('\n')}\n\nContinue?`
+        )
+      ) {
+        return;
+      }
+
       this.categoryStore.removeClass(this.categoryId);
+      this.$refs.edit.hide();
     },
     checkFormValidity() {
       return this.valid;
