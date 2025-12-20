@@ -9,7 +9,12 @@ div
           :disabled="bucketOptions.length === 0 || loading"
         )
     b-col(cols="12", md="6").mb-2
-      b-form-group(label="Field in event data")
+      b-form-group
+        template(#label)
+          span Field in event data
+          span.info-icon(
+            title="Field names come from event data; dot notation is supported."
+          ) i
         b-form-select(
           v-model="selectedField",
           :options="fieldSelectOptions",
@@ -21,7 +26,7 @@ div
           placeholder="Enter field path, e.g. data.app or data.$category",
           :disabled="loading"
         )
-        small.text-muted Field names come from event data; dot notation is supported.
+        // helper text moved to tooltip on the info icon above
 
   b-alert.mt-2(v-if="error", show, variant="danger") {{ error }}
   b-alert.mt-2(v-else-if="!selectedBucketId" show variant="info")
@@ -66,13 +71,18 @@ function formatValue(value: unknown): string {
 
 export default {
   name: 'aw-watcher-columns',
+  props: {
+    initialBucketId: { type: String, default: '' },
+    initialField: { type: String, default: '' },
+    initialCustomField: { type: String, default: '' },
+  },
   data() {
     return {
       bucketsStore: useBucketsStore(),
       activityStore: useActivityStore(),
-      selectedBucketId: '',
-      selectedField: '',
-      customField: '',
+      selectedBucketId: this.initialBucketId || '',
+      selectedField: this.initialField || '',
+      customField: this.initialCustomField || '',
       fieldOptions: [] as string[],
       events: [] as any[],
       aggregated: [] as AggregatedEvent[],
@@ -114,8 +124,20 @@ export default {
     },
   },
   watch: {
-    selectedBucketId: 'loadEvents',
-    selectedFieldValue: 'aggregate',
+    selectedBucketId: function () {
+      this.emitSelection();
+      this.loadEvents();
+    },
+    selectedField: function () {
+      this.emitSelection();
+      this.aggregate();
+    },
+    customField: function () {
+      if (this.selectedField === '__custom') {
+        this.emitSelection();
+        this.aggregate();
+      }
+    },
     timeRange: {
       handler() {
         this.loadEvents();
@@ -126,6 +148,7 @@ export default {
   async mounted() {
     await this.bucketsStore.ensureLoaded();
     this.setDefaultBucket();
+    this.emitSelection();
     if (this.selectedBucketId) {
       await this.loadEvents();
     }
@@ -206,6 +229,29 @@ export default {
 
       this.aggregated = Array.from(grouped.values()).sort((a, b) => b.duration - a.duration);
     },
+    emitSelection() {
+      this.$emit('update-props', {
+        bucketId: this.selectedBucketId,
+        field: this.selectedField === '__custom' ? '__custom' : this.selectedField,
+        customField: this.selectedField === '__custom' ? this.customField : '',
+      });
+    },
   },
 };
 </script>
+
+<style scoped>
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.25rem;
+  width: 1.15em;
+  height: 1.15em;
+  border: 1px solid #888;
+  border-radius: 50%;
+  font-size: 0.75em;
+  color: #555;
+  cursor: help;
+}
+</style>

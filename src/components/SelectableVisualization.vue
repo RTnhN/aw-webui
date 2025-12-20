@@ -78,7 +78,12 @@ div
     div(v-if="type == 'category_sunburst'")
       aw-sunburst-categories(:data="top_categories_hierarchy", style="height: 20em")
     div(v-if="type == 'watcher_sunburst'")
-      aw-watcher-columns
+      aw-watcher-columns(
+        :initialBucketId="props ? props.bucketId : ''",
+        :initialField="props ? props.field : ''",
+        :initialCustomField="props ? props.customField : ''",
+        @update-props="onWatcherPropsChange"
+      )
     div(v-if="type == 'timeline_barchart'")
       aw-timeline-barchart(:datasets="datasets", :timeperiod_start="activityStore.query_options.timeperiod.start", :timeperiod_length="activityStore.query_options.timeperiod.length", style="height: 100")
     div(v-if="type == 'sunburst_clock'")
@@ -122,6 +127,7 @@ import { build_category_hierarchy } from '~/util/classes';
 import { useActivityStore } from '~/stores/activity';
 import { useCategoryStore } from '~/stores/categories';
 import { useBucketsStore } from '~/stores/buckets';
+import { useViewsStore } from '~/stores/views';
 
 import moment from 'moment';
 
@@ -137,6 +143,7 @@ export default {
     id: Number,
     type: String,
     props: Object,
+    viewId: { type: String, default: '' },
     editable: { type: Boolean, default: true },
     categorizeMode: { type: Boolean, default: false },
   },
@@ -338,6 +345,16 @@ export default {
     }
   },
   methods: {
+    onWatcherPropsChange(newProps) {
+      if (!this.viewId) return;
+      const mergedProps = { ...(this.props || {}), ...newProps };
+      useViewsStore().editView({
+        view_id: this.viewId,
+        el_id: this.id,
+        type: this.type,
+        props: mergedProps,
+      });
+    },
     getTimelineBuckets: async function () {
       if (this.type != 'vis_timeline') return;
       if (!this.timeline_daterange) return;
