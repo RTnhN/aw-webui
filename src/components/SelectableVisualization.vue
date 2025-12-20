@@ -77,7 +77,7 @@ div
       aw-categorytree(:events="activityStore.category.top")
     div(v-if="type == 'category_sunburst'")
       aw-sunburst-categories(:data="top_categories_hierarchy", style="height: 20em")
-    div(v-if="type == 'watcher_sunburst'")
+    div(v-if="type == 'watcher_columns'")
       aw-watcher-columns(
         :initialBucketId="props ? props.bucketId : ''",
         :initialField="props ? props.field : ''",
@@ -161,7 +161,7 @@ export default {
         'top_categories',
         'category_tree',
         'category_sunburst',
-        'watcher_sunburst',
+        'watcher_columns',
         'top_editor_files',
         'top_editor_languages',
         'top_editor_projects',
@@ -240,7 +240,7 @@ export default {
           title: 'Category Sunburst',
           available: this.activityStore.category.available,
         },
-        watcher_sunburst: {
+        watcher_columns: {
           title: 'Watcher Columns',
           available: true,
         },
