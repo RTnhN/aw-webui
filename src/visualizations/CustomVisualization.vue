@@ -1,5 +1,5 @@
 <template lang="pug">
-div
+div.custom-vis-frame(:style="{ height }")
   iframe(:src='src', frameborder='0')
 </template>
 
@@ -12,6 +12,10 @@ export default {
   props: {
     visname: String,
     title: String,
+    height: {
+      type: String,
+      default: '20em',
+    },
   },
   computed: {
     src: function () {
@@ -34,3 +38,20 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.custom-vis-frame {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  border: 0;
+}
+</style>

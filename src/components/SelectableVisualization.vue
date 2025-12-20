@@ -77,12 +77,19 @@ div
       aw-categorytree(:events="activityStore.category.top")
     div(v-if="type == 'category_sunburst'")
       aw-sunburst-categories(:data="top_categories_hierarchy", style="height: 20em")
+    div(v-if="type == 'watcher_sunburst'")
+      aw-watcher-columns(
+        :initialBucketId="props ? props.bucketId : ''",
+        :initialField="props ? props.field : ''",
+        :initialCustomField="props ? props.customField : ''",
+        @update-props="onWatcherPropsChange"
+      )
     div(v-if="type == 'timeline_barchart'")
       aw-timeline-barchart(:datasets="datasets", :timeperiod_start="activityStore.query_options.timeperiod.start", :timeperiod_length="activityStore.query_options.timeperiod.length", style="height: 100")
     div(v-if="type == 'sunburst_clock'")
       aw-sunburst-clock(:date="date", :afkBucketId="activityStore.buckets.afk[0]", :windowBucketId="activityStore.buckets.window[0]")
     div(v-if="type == 'custom_vis'")
-      aw-custom-vis(:visname="props.visname" :title="props.title")
+      aw-custom-vis(:visname="props.visname" :title="props.title" height="20em")
     div(v-if="type == 'vis_timeline' && isSingleDay")
       vis-timeline(:buckets="timeline_buckets", :showRowLabels='true', :queriedInterval="timeline_daterange")
     div(v-if="type == 'score'")
@@ -120,6 +127,7 @@ import { build_category_hierarchy } from '~/util/classes';
 import { useActivityStore } from '~/stores/activity';
 import { useCategoryStore } from '~/stores/categories';
 import { useBucketsStore } from '~/stores/buckets';
+import { useViewsStore } from '~/stores/views';
 
 import moment from 'moment';
 
@@ -135,6 +143,7 @@ export default {
     id: Number,
     type: String,
     props: Object,
+    viewId: { type: String, default: '' },
     editable: { type: Boolean, default: true },
     categorizeMode: { type: Boolean, default: false },
   },
@@ -152,6 +161,7 @@ export default {
         'top_categories',
         'category_tree',
         'category_sunburst',
+        'watcher_sunburst',
         'top_editor_files',
         'top_editor_languages',
         'top_editor_projects',
@@ -229,6 +239,10 @@ export default {
         category_sunburst: {
           title: 'Category Sunburst',
           available: this.activityStore.category.available,
+        },
+        watcher_sunburst: {
+          title: 'Watcher Columns',
+          available: true,
         },
         timeline_barchart: {
           title: 'Timeline (barchart)',
@@ -331,6 +345,16 @@ export default {
     }
   },
   methods: {
+    onWatcherPropsChange(newProps) {
+      if (!this.viewId) return;
+      const mergedProps = { ...(this.props || {}), ...newProps };
+      useViewsStore().editView({
+        view_id: this.viewId,
+        el_id: this.id,
+        type: this.type,
+        props: mergedProps,
+      });
+    },
     getTimelineBuckets: async function () {
       if (this.type != 'vis_timeline') return;
       if (!this.timeline_daterange) return;
