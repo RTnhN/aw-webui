@@ -77,12 +77,14 @@ div
       aw-categorytree(:events="activityStore.category.top")
     div(v-if="type == 'category_sunburst'")
       aw-sunburst-categories(:data="top_categories_hierarchy", style="height: 20em")
+    div(v-if="type == 'watcher_sunburst'")
+      aw-watcher-columns
     div(v-if="type == 'timeline_barchart'")
       aw-timeline-barchart(:datasets="datasets", :timeperiod_start="activityStore.query_options.timeperiod.start", :timeperiod_length="activityStore.query_options.timeperiod.length", style="height: 100")
     div(v-if="type == 'sunburst_clock'")
       aw-sunburst-clock(:date="date", :afkBucketId="activityStore.buckets.afk[0]", :windowBucketId="activityStore.buckets.window[0]")
     div(v-if="type == 'custom_vis'")
-      aw-custom-vis(:visname="props.visname" :title="props.title")
+      aw-custom-vis(:visname="props.visname" :title="props.title" height="20em")
     div(v-if="type == 'vis_timeline' && isSingleDay")
       vis-timeline(:buckets="timeline_buckets", :showRowLabels='true', :queriedInterval="timeline_daterange")
     div(v-if="type == 'score'")
@@ -152,6 +154,7 @@ export default {
         'top_categories',
         'category_tree',
         'category_sunburst',
+        'watcher_sunburst',
         'top_editor_files',
         'top_editor_languages',
         'top_editor_projects',
@@ -229,6 +232,10 @@ export default {
         category_sunburst: {
           title: 'Category Sunburst',
           available: this.activityStore.category.available,
+        },
+        watcher_sunburst: {
+          title: 'Watcher Columns',
+          available: true,
         },
         timeline_barchart: {
           title: 'Timeline (barchart)',
