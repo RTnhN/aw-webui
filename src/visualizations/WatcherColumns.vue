@@ -110,7 +110,9 @@ export default {
       const opts = this.activityStore.query_options;
       if (!opts || !opts.timeperiod) return null;
       const start = opts.timeperiod.start;
-      const end = moment(start).add(...opts.timeperiod.length).toISOString();
+      const end = moment(start)
+        .add(...opts.timeperiod.length)
+        .toISOString();
       return { start, end };
     },
     namefunc(): (e: AggregatedEvent) => string {
@@ -157,9 +159,7 @@ export default {
     setDefaultBucket() {
       if (this.selectedBucketId) return;
       const host = this.activityStore.query_options && this.activityStore.query_options.host;
-      const byHost = host
-        ? this.bucketsStore.buckets.filter(b => b.hostname === host)
-        : [];
+      const byHost = host ? this.bucketsStore.buckets.filter(b => b.hostname === host) : [];
       if (byHost.length > 0) {
         this.selectedBucketId = byHost[0].id;
       } else if (this.bucketsStore.buckets.length > 0) {
