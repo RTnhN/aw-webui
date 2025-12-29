@@ -25,6 +25,7 @@ interface State {
   startOfDay: string;
   startOfWeek: string;
   durationDefault: number;
+  timelineZoomKey: 'ctrlKey' | 'altKey' | 'metaKey' | 'none';
   useColorFallback: boolean;
   landingpage: string;
   theme: 'light' | 'dark' | 'auto';
@@ -56,6 +57,7 @@ export const useSettingsStore = defineStore('settings', {
     startOfDay: '04:00',
     startOfWeek: 'Monday',
     durationDefault: 4 * 60 * 60,
+    timelineZoomKey: 'none',
     useColorFallback: false,
     landingpage: '/home',
 

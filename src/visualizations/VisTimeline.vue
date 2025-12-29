@@ -41,12 +41,23 @@ import { buildTooltip } from '../util/tooltip.js';
 import { getCategoryColorFromEvent, getTitleAttr } from '../util/color';
 import { getSwimlane } from '../util/swimlane.js';
 import { IEvent } from '../util/interfaces';
+import { useSettingsStore } from '~/stores/settings';
 
 import { Timeline } from 'vis-timeline/esnext';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import EventEditor from '~/components/EventEditor.vue';
 
 let isAlertWarningShown = false;
+
+const mapZoomKeySetting = (value: 'ctrlKey' | 'altKey' | 'metaKey' | 'none' | string | undefined) => {
+  if (value === 'none' || value === '') {
+    return '';
+  }
+  if (value === 'ctrl' || value === 'alt' || value === 'meta') {
+    return value + 'Key';
+  }
+  return value || '';
+};
 
 interface IChartDataItem {
   bucketId: string;
@@ -120,6 +131,7 @@ export default {
     tool: { type: String, default: null },
   },
   data() {
+    const settingsStore = useSettingsStore();
     return {
       timeline: null,
       filterShortEvents: true,
@@ -128,6 +140,7 @@ export default {
       options: {
         zoomMin: 1000 * 60, // 10min in milliseconds
         zoomMax: 1000 * 60 * 60 * 24 * 31 * 3, // about three months in milliseconds
+        zoomKey: mapZoomKeySetting(settingsStore.timelineZoomKey),
         stack: false,
         tooltip: {
           followMouse: true,
@@ -143,9 +156,13 @@ export default {
 
       undoStack: [] as UndoEntry[],
       undoLimit: 20,
+      settingsStore,
     };
   },
   computed: {
+    zoomKeySetting(): string {
+      return mapZoomKeySetting(this.settingsStore.timelineZoomKey);
+    },
     bucketsFromEither() {
       if (this.buckets) {
         return this.buckets;
@@ -194,6 +211,12 @@ export default {
     },
   },
   watch: {
+    zoomKeySetting(newVal) {
+      this.options.zoomKey = newVal;
+      if (this.timeline) {
+        this.timeline.setOptions(this.options);
+      }
+    },
     tool(newVal) {
       if (!['glue', 'grow', 'shrink', 'clone', 'swap'].includes(newVal || '')) {
         this.pendingSelection = null;

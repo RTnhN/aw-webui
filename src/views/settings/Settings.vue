@@ -12,6 +12,10 @@ div
 
   hr
 
+  TimelineZoomSettings
+
+  hr
+
   LandingPageSettings
 
   hr
@@ -44,6 +48,7 @@ import { useSettingsStore } from '~/stores/settings';
 
 import DaystartSettings from '~/views/settings/DaystartSettings.vue';
 import TimelineDurationSettings from '~/views/settings/TimelineDurationSettings.vue';
+import TimelineZoomSettings from '~/views/settings/TimelineZoomSettings.vue';
 import ReleaseNotificationSettings from '~/views/settings/ReleaseNotificationSettings.vue';
 import CategorizationSettings from '~/views/settings/CategorizationSettings.vue';
 import LandingPageSettings from '~/views/settings/LandingPageSettings.vue';
@@ -57,6 +62,7 @@ export default {
   components: {
     DaystartSettings,
     TimelineDurationSettings,
+    TimelineZoomSettings,
     ReleaseNotificationSettings,
     CategorizationSettings,
     LandingPageSettings,

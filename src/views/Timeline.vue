@@ -59,7 +59,7 @@ div
   b-alert.d-inline-block.p-2.mb-0.mt-2(v-if="num_events === 0", variant="warning", show)
     | No events match selected criteria. Timeline is not updated.
   div(style="float: right; color: #999").d-inline-block.pt-3
-    | Drag to pan and scroll to zoom
+    | Drag to pan and {{ zoomInstruction }}
 
   div(style="clear: both")
   div.mt-3.mb-2
@@ -109,6 +109,21 @@ import { useSettingsStore } from '~/stores/settings';
 import { useBucketsStore } from '~/stores/buckets';
 import 'vue-awesome/icons/filter';
 
+const zoomInstructionText = (zoomKey: string | undefined) => {
+  switch (zoomKey) {
+    case 'altKey':
+      return 'hold Alt/Option while scrolling to zoom';
+    case 'metaKey':
+      return 'hold Cmd/Meta while scrolling to zoom';
+    case '':
+    case 'none':
+      return 'scroll to zoom';
+    case 'ctrlKey':
+    default:
+      return 'hold Ctrl while scrolling to zoom';
+  }
+};
+
 export default {
   name: 'Timeline',
   data() {
@@ -146,6 +161,10 @@ export default {
     timeintervalDefaultDuration(): number {
       const settingsStore = useSettingsStore();
       return Number(settingsStore.durationDefault);
+    },
+    zoomInstruction(): string {
+      const settingsStore = useSettingsStore();
+      return zoomInstructionText(settingsStore.timelineZoomKey);
     },
     num_events(): number {
       return _.sumBy(this.buckets || [], 'events.length');
