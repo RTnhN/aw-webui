@@ -109,6 +109,26 @@ function fallbackColor(str: string): string {
   }
 }
 
+function getColorFromData(data: Record<string, any>): string | null {
+  const rawColor = data?.timeline_color;
+  if (typeof rawColor !== 'string') {
+    return null;
+  }
+
+  const trimmed = rawColor.trim();
+  // Accept #RRGGBB, optionally with trailing AA (opacity) which we ignore
+  const match = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return Color(`#${match[1]}`).hex();
+  } catch {
+    return null;
+  }
+}
+
 export function getTitleAttr(bucket: { type?: string }, e: IEvent) {
   if (bucket.type == 'currentwindow') {
     return e.data.app;
@@ -128,6 +148,11 @@ export function getTitleAttr(bucket: { type?: string }, e: IEvent) {
 }
 
 export function getCategoryColorFromEvent(bucket: IBucket, e: IEvent) {
+  const dataColor = getColorFromData(e.data);
+  if (dataColor) {
+    return dataColor;
+  }
+
   if (bucket.type == 'currentwindow') {
     // using linebreak and "m" regex flag to make `$` and `^` work
     return getCategoryColorFromString(e.data.app + '\n' + e.data.title);
