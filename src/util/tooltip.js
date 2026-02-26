@@ -21,6 +21,13 @@ export function buildTooltip(bucket, e) {
     stop = stop.format('YYYY-MM-DD HH:mm:ss');
   }
 
+  const dataLines = Object.entries(e.data || {})
+    .map(([key, value]) => {
+      const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+      return `${sanitize(key)}: ${sanitize(valueStr)}`;
+    })
+    .join('<br>');
+
   if (bucket.type == 'currentwindow') {
     inner = `
       <tr><th>App</th><td>${sanitize(e.data.app)}</td></tr>
@@ -43,7 +50,7 @@ export function buildTooltip(bucket, e) {
       `;
   } else {
     inner = `
-      <tr><th>Data</th><td>${sanitize(JSON.stringify(e.data))}</td></tr>
+      <tr><th>Data</th><td>${dataLines}</td></tr>
       `;
   }
   return `<table>

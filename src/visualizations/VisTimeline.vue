@@ -31,6 +31,11 @@ div#visualization {
     border-radius: 2px;
   }
 }
+
+.vis-tooltip tbody {
+  vertical-align: top;
+}
+
 </style>
 
 <script lang="ts">
